@@ -126,7 +126,8 @@ it's a work in progress and rough edges show up. **Help is genuinely wanted.**
   submitting.
 
 Good first areas: broader grinder presets, more provider defaults, questionnaire and
-advice-copy polish, and squashing the layout/edge-case bugs listed in the issues.
+advice-copy polish, and any edge cases you hit on other grinders, providers, or tablets
+(the [open issues](../../issues) track what's known so far).
 
 ## Building & developing
 
