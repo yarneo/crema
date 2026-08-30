@@ -73,9 +73,11 @@ grep -E 'CREMA-SELFTEST|CREMA-DEVSHOT' ../de1app/de1plus/log.txt
 
 ## 6. Optional: local Mac-server mode (advanced)
 
-If you have a Claude Max subscription and would rather not pay per API call, Crema can
-route advice through a `claude` CLI running on your own Mac. In the setup wizard pick
-**Local Mac server** and set the advisor URL to your Mac's LAN address.
+If you have a Claude **Pro or Max** subscription and would rather not pay per API call,
+Crema can route advice through the `claude` CLI running on your own Mac. In the setup
+wizard pick **Local Mac server** and set the advisor URL to your Mac's LAN address.
+(It's wired to the `claude` CLI today; routing other subscription CLIs like OpenAI's
+Codex or the Gemini CLI is a small adapter away — see issue #4.)
 
 Run the server:
 

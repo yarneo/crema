@@ -79,9 +79,16 @@ Crema works with any of these. Your key is stored only on your tablet.
 | **Anthropic (Claude)** | Key from [console.anthropic.com](https://console.anthropic.com) | ~1–2¢ | Default. Best-tasting advice in testing. |
 | **OpenAI (GPT)** | Key from [platform.openai.com](https://platform.openai.com) | ~1–2¢ | |
 | **OpenAI-compatible** | A base URL + model | Free if local | Ollama, LM Studio, OpenRouter, etc. Run a model on your own machine for zero cost. |
-| **Local Mac server** | The bundled advisor server | Free w/ Claude Max | Advanced. Routes through a `claude` CLI on your Mac so shots bill to a Max subscription instead of per-call. See [DEPLOY.md](DEPLOY.md). |
+| **Local Mac server** | The bundled advisor server | Free w/ Claude Pro/Max | Advanced. Routes through the `claude` CLI on your Mac so shots draw on a Claude **Pro or Max** subscription instead of per-call billing. See [DEPLOY.md](DEPLOY.md). |
 
 You can change provider or key any time in **Settings → AI setup**.
+
+> **On subscriptions:** you don't need one — the normal path is a metered key (a cent or
+> two per shot) or a free local model. The Mac-server mode is a bonus for people who
+> already pay for **Claude Pro/Max**. It ships wired to the `claude` CLI today; other
+> subscription CLIs (OpenAI's Codex with a ChatGPT plan, Gemini CLI, etc.) are a small
+> adapter away — tracked in [#4](../../issues/4). Note a *ChatGPT Plus* subscription
+> can't be used directly as a metered key; for OpenAI, use a pay-as-you-go API key.
 
 ### 💡 The model matters — a lot
 
