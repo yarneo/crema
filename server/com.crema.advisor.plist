@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Crema advisor server (OPTIONAL "Local Mac server" mode).
+  Before installing, replace the three placeholders below with your own paths:
+    __UV_PATH__      absolute path to `uv`      (find with: which uv)
+    __INSTALL_DIR__  where you cloned this repo (e.g. /Users/you/decent-ai-skin)
+    __HOME__         your home directory        (echo $HOME)
+  See DEPLOY.md for the full install steps.
+-->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.crema.advisor</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>__UV_PATH__</string>
+		<string>run</string>
+		<string>uvicorn</string>
+		<string>advisor.main:app</string>
+		<string>--host</string>
+		<string>0.0.0.0</string>
+		<string>--port</string>
+		<string>8877</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>__INSTALL_DIR__/server</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>__HOME__/.local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+	</dict>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+	<key>StandardOutPath</key>
+	<string>/tmp/crema-advisor.log</string>
+	<key>StandardErrorPath</key>
+	<string>/tmp/crema-advisor.log</string>
+</dict>
+</plist>

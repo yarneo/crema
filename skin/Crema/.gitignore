@@ -1,0 +1,3 @@
+# de1app runtime state + Crema's own settings — personal, must not ship as defaults
+settings.tdb
+crema_settings.tdb

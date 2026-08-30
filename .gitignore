@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.venv/
+server/data/
+.env
+.DS_Store
+
+# build output — ship releases via GitHub Releases, not the repo
+dist/

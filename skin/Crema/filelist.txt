@@ -1,0 +1,27 @@
+1280x800/icon.jpg
+1280x800/splash.jpg
+2560x1600/icon.jpg
+2560x1600/splash.jpg
+fonts/Font Awesome 5 Free-Solid-900.otf
+fonts/Mazzard Light.otf
+fonts/Mazzard Medium.otf
+fonts/Mazzard Regular.otf
+fonts/Mazzard SemiBold.otf
+framework.tcl
+interfaces/default_settings_screen.tcl
+interfaces/default_ui.tcl
+interfaces/magadan_ui.tcl
+backgrounds/2560x1600/coffee_beans.jpg
+backgrounds/1280x800/coffee_beans.jpg
+settings.tcl
+theme.tcl
+skin.tcl
+ai/llm.tcl
+ai/store.tcl
+ai/history.tcl
+ai/advisor.tcl
+ai/setup.tcl
+ai/pages.tcl
+ai/dashboard.tcl
+ai/home.tcl
+ai/shot_detail.tcl
