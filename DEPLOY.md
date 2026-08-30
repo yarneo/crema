@@ -38,7 +38,7 @@ On first launch Crema shows the **Set up Crema** wizard:
 2. **AI provider** — pick one and enter its key (or base URL). See the provider table
    in [README.md](README.md#choosing-a-provider). The key is stored only on this tablet.
 
-Tap **Save & brew**. You can change any of this later in **Settings → AI setup**.
+Tap **Save & continue**. You can change any of this later in **Settings → AI setup**.
 
 ## 4. Everyday flow
 
