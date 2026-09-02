@@ -70,6 +70,11 @@ proc ::crema::load_settings {} {
 			array set ::crema_settings [encoding convertfrom utf-8 [read_binary_file [::crema::legacy_settings_filename]]]
 		}
 	}
+	# theme_status is a "saved - restart to apply" nudge meant for the moments
+	# right after you press the button. It gets persisted with everything else,
+	# so it survived the very restart it was asking for and then sat on the
+	# settings page claiming a pending change that had already happened.
+	set ::crema_settings(theme_status) ""
 }
 
 proc ::crema::save_settings {} {

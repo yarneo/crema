@@ -1,6 +1,6 @@
 
 add_background "iconik_settings"
-add_de1_text "iconik_settings" 1370 60 -text "Restart the app via system settings after making changes" -anchor w -justify center -font $::font_small -fill [::theme background_text]
+add_de1_text "iconik_settings" 1370 60 -text "Changes here apply after an app restart" -anchor w -justify center -font $::font_small -fill [::theme background_text]
 add_de1_text "iconik_settings" 2550 1580 -text "$::version_string" -anchor "e" -justify center -font $::font_tiniest -fill [::theme background_text]
 add_de1_variable "iconik_settings" 1370 1580 -justify center -anchor "w" -text "" -font $::font_tiniest  -fill  [::theme background_text]  -width [rescale_x_skin 520] -textvariable {Screensaver folder: $::iconik_settings(saver_dir)}
 
@@ -55,12 +55,15 @@ create_settings_button "iconik_settings" 2150 1360 2480 1510 $::font_tinier [::t
 add_de1_text  "iconik_settings" 1370 140 -text "Crema:" -anchor w -justify center -font $::font_small_header -fill [::theme accent]
 
 add_de1_text  "iconik_settings" 1370 200 -text "Theme (restart app to apply):" -anchor w -justify center -font $::font_tiny -fill [::theme background_text]
-create_button "iconik_settings" 1370 250 1570 360 $::font_tiny [::theme button] [::theme background_text] {set ::crema_settings(theme_variant) "dark"; set ::crema_settings(theme_status) "Dark saved - restart the app to apply"; ::crema::save_settings} "Dark"
-create_button "iconik_settings" 1630 250 1830 360 $::font_tiny [::theme button] [::theme background_text] {set ::crema_settings(theme_variant) "light"; set ::crema_settings(theme_status) "Light saved - restart the app to apply"; ::crema::save_settings} "Light"
-add_de1_variable "iconik_settings" 1890 300 -anchor w -justify left -font $::font_tiny -fill [::theme accent] -textvariable {$::crema_settings(theme_status)}
+create_button "iconik_settings" 1370 250 1570 360 $::font_tiny [::theme button] [::theme background_text] {set ::crema_settings(theme_variant) "dark"; set ::crema_settings(theme_status) "Dark saved - restart to apply"; ::crema::save_settings} "Dark"
+create_button "iconik_settings" 1630 250 1830 360 $::font_tiny [::theme button] [::theme background_text] {set ::crema_settings(theme_variant) "light"; set ::crema_settings(theme_status) "Light saved - restart to apply"; ::crema::save_settings} "Light"
+# nothing on this page said which theme was actually in force - you pressed
+# a button and got "saved", with no way to see the current setting
+add_de1_variable "iconik_settings" 1890 305 -anchor w -justify left -font $::font_tiny -fill [::theme muted] -textvariable {now: $::crema_settings(theme_variant)}
+add_de1_variable "iconik_settings" 1370 400 -anchor w -justify left -font $::font_tiny -fill [::theme accent] -textvariable {$::crema_settings(theme_status)}
 
-add_de1_text  "iconik_settings" 1370 430 -text "Grinder (name shown everywhere; the AI adapts advice to its dial):" -anchor w -justify center -font $::font_tiny -fill [::theme background_text]
-add_de1_widget "iconik_settings" entry 1370 470 {} -textvariable ::crema_settings(grinder_name) -font $::font_small -width 24 -borderwidth 1 -bg [::theme card_fill] -foreground [::theme background_text] -insertbackground [::theme accent] -relief flat -highlightthickness 1 -highlightcolor [::theme accent]
+add_de1_text  "iconik_settings" 1370 470 -text "Grinder name (the AI adapts advice to its dial):" -anchor w -justify center -font $::font_tiny -fill [::theme background_text]
+add_de1_widget "iconik_settings" entry 1370 510 {} -textvariable ::crema_settings(grinder_name) -font $::font_small -width 24 -borderwidth 1 -bg [::theme card_fill] -foreground [::theme background_text] -insertbackground [::theme accent] -relief flat -highlightthickness 1 -highlightcolor [::theme accent]
 
 add_de1_text  "iconik_settings" 1370 600 -text "AI provider & API key:" -anchor w -justify center -font $::font_tiny -fill [::theme background_text]
 create_button "iconik_settings" 1370 640 1830 750 $::font_small [::theme button_secondary] [::theme background_text] { iconik_save_settings; catch { ::crema::save_settings }; dui page load crema_setup } "AI setup / API key"
