@@ -73,7 +73,9 @@ provable without hardware.
 - [x] Profile authorship parsing, and the grind rules ported from Tcl
 - [x] Gateway client: REST, workflow read/apply/undo, timeouts ([#7](https://github.com/yarneo/crema/issues/7))
 - [ ] WebSocket telemetry for the live shot
-- [ ] Provider clients: Anthropic, OpenAI, OpenAI-compatible, Mac server
+- [x] Provider clients: Anthropic, OpenAI, Google, OpenAI-compatible, Mac server
+- [x] Shot-curve preparation: downsampling, weight-curve gating
+- [ ] Prompt assembly, including the flow-phase analysis
 - [ ] Views: the three signatures, then the borrowed craft
 
 Design rationale for the port and the UI direction is in the design brief; the
