@@ -9,6 +9,15 @@ you in one tap.
 It runs **entirely on the tablet**. You bring an API key from any major AI provider;
 Crema talks to it directly over your wifi. No companion app, no server, no account.
 
+> 🌱 **There is a second, newer Crema.** Decent shipped
+> [Decaid](https://github.com/decentespresso/decaid), a next-generation
+> cross-platform app whose skins are web apps, and Crema has been ported to it
+> on the [`decaid` branch](../../tree/decaid). That version needs **Android 9+**,
+> macOS or desktop. This branch is the skin for the classic **de1app**, which is
+> what existing DE1 tablets run — including the Android 8.1 tablets Decent
+> shipped around 2019-2020, where Decaid cannot be installed at all. Both are
+> maintained.
+
 > ⚠️ **Work in progress.** Crema is used daily on a real machine, but it's young and
 > bugs still surface. If you hit one, please [open an issue](../../issues) — and if
 > you'd like to help build it, see [Contributing](#contributing). PRs very welcome.

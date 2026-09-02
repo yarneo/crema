@@ -7,3 +7,9 @@ server/data/
 
 # build output — ship releases via GitHub Releases, not the repo
 dist/
+
+# The Decaid port lives on the `decaid` branch. Its dependencies and build
+# output can linger here on disk after switching branches, and they must never
+# be committed to this one — a `git rm -r web` once took web/.gitignore with it
+# and a following `git add -A` committed all of node_modules.
+web/
