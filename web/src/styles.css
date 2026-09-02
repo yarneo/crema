@@ -261,3 +261,36 @@ svg { display: block; width: 100%; height: auto; }
   background: transparent; color: var(--muted); cursor: pointer; text-decoration: none;
 }
 .statlink:hover { color: var(--ink); border-color: var(--muted); }
+
+/* ---------------------------------------------------------------------------
+   Flexbox gap fallback.
+
+   Chrome 78 (the Android 8.1 Decent tablets, frozen with no Play Store) has
+   no flexbox gap. `@supports (gap: 1px)` cannot detect that, because gap is
+   valid on grid much earlier, so compat.ts measures it and sets this class.
+   Grid containers need nothing — grid gap has worked since Chrome 66.
+   --------------------------------------------------------------------------- */
+
+.no-flex-gap .app > * + *          { margin-top: 14px; }
+.no-flex-gap .statusbar > * + *    { margin-left: 22px; }
+.no-flex-gap .stat > * + *         { margin-left: 8px; }
+.no-flex-gap .tabs > * + *         { margin-left: 6px; }
+.no-flex-gap .actionbar > * + *    { margin-left: 8px; }
+.no-flex-gap .bean > * + *         { margin-left: 12px; }
+.no-flex-gap .cell > * + *         { margin-top: 7px; }
+.no-flex-gap .cell .row > * + *    { margin-left: 8px; }
+.no-flex-gap .card > header > * + *{ margin-left: 14px; }
+.no-flex-gap .nums > * + *         { margin-left: 8px; }
+.no-flex-gap .actions > * + *      { margin-left: 9px; }
+.no-flex-gap .chips > * + *        { margin-left: 7px; }
+.no-flex-gap .legend > * + *       { margin-left: 15px; }
+.no-flex-gap .legend span > * + *  { margin-left: 6px; }
+.no-flex-gap .addbean > * + *      { margin-left: 8px; }
+.no-flex-gap .setup label > * + *  { margin-top: 6px; }
+.no-flex-gap .rebuttal > * + *     { margin-top: 8px; }
+.no-flex-gap .bignums > * + *      { margin-left: 40px; }
+.no-flex-gap .bignums div > * + *  { margin-left: 9px; }
+
+/* The list draws its hairlines with a 1px gap over a coloured background,
+   which without gap collapses to no divider at all. */
+.no-flex-gap .list > * + * { border-top: 1px solid var(--line); }

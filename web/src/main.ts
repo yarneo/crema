@@ -21,6 +21,8 @@ import { Gateway, resolveGatewayOrigin } from './gateway/client.ts';
 import { diffToWorkflowPatch, undoPatch, workflowToRecipe } from './gateway/workflow.ts';
 import type { BeanBatchWire, BeanWire, ProfileEntryWire, WorkflowPatch, WorkflowWire } from './gateway/types.ts';
 import { applyDiff, diffRecipe, type Recipe } from './domain/recipe.ts';
+import { last } from './domain/last.ts';
+import { applyCompatFlags } from './compat.ts';
 import { buildTrail, type TrailNode, type TrailShot } from './domain/trail.ts';
 import { describeRating, EMPTY_RATING, type Rating, type RatingKey } from './domain/rating.ts';
 import { analyseFlowPhases } from './advice/phases.ts';
@@ -147,7 +149,7 @@ const state: State = {
 // Sample fallbacks, used only until there is real history. Both go through the
 // real parser and the real diff, so the rendered path is the production one.
 const sample = sampleShot();
-const sampleParsed = parseAdvice(SAMPLE_ADVICE_JSON, { shotDurationS: sample.elapsedS.at(-1) });
+const sampleParsed = parseAdvice(SAMPLE_ADVICE_JSON, { shotDurationS: last(sample.elapsedS) });
 const sampleTrail = buildTrail(sampleTrailShots());
 
 // ---------------------------------------------------------------------------
@@ -374,9 +376,9 @@ function renderBrew(): string {
     })}
     ${renderRecipe(state.recipe)}
     ${state.live ? renderLive({
-      pressureBar: state.live.samples.at(-1)?.pressureBar ?? 0,
-      flowMlS: state.live.samples.at(-1)?.flowMlS ?? 0,
-      elapsedS: state.live.samples.at(-1)?.elapsedS ?? 0
+      pressureBar: last(state.live.samples)?.pressureBar ?? 0,
+      flowMlS: last(state.live.samples)?.flowMlS ?? 0,
+      elapsedS: last(state.live.samples)?.elapsedS ?? 0
     }) : ''}
     ${state.pending || state.advice ? renderRating({
       rating: state.rating,
@@ -579,7 +581,7 @@ async function getAdvice(): Promise<void> {
 
   try {
     const reply = await askProvider(state.settings, prompt);
-    const parsed = parseAdvice(reply, { shotDurationS: curves.elapsedS.at(-1) });
+    const parsed = parseAdvice(reply, { shotDurationS: last(curves.elapsedS) });
 
     if (!parsed.ok) {
       state.adviceError = parsed.error;
@@ -616,7 +618,7 @@ async function reconsider(text: string): Promise<void> {
 
   try {
     const reply = await askProvider(state.settings, buildPrompt(adviceRequest(record, curves, rebuttal)));
-    const parsed = parseAdvice(reply, { shotDurationS: curves.elapsedS.at(-1) });
+    const parsed = parseAdvice(reply, { shotDurationS: last(curves.elapsedS) });
 
     if (!parsed.ok) {
       state.adviceError = parsed.error;
@@ -1065,6 +1067,10 @@ root.addEventListener('change', (event) => {
 // ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
+
+// Before the first paint, so the fallback spacing is in place rather than
+// applied after the layout has already been seen.
+applyCompatFlags();
 
 render();
 void refreshWorkflow();

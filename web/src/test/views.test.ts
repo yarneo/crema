@@ -14,6 +14,7 @@ import {
 } from '../ui/views.ts';
 import { diffRecipe, type Recipe } from '../domain/recipe.ts';
 import { EMPTY_RATING } from '../domain/rating.ts';
+import { applyCompatFlags, supportsFlexGap } from '../compat.ts';
 
 const recipe: Recipe = {
   profileTitle: 'Gentle Decline',
@@ -302,4 +303,35 @@ test('a shot with no advice says so instead of leaving a blank row', () => {
   });
   assert.match(html, /None was asked for/);
   assert.match(html, /recorded before curves were stored/, 'and explains the missing chart honestly');
+});
+
+// ---- old-browser compatibility -------------------------------------------
+
+test('flex gap is measured, not feature-queried', () => {
+  // A fake DOM where a column flex box with a row gap reports no height, the
+  // way Chrome 78 behaves. @supports cannot see this, because grid gap is far
+  // older and answers true.
+  const classes = new Set<string>();
+  const noGapDoc = {
+    createElement: () => ({ style: {}, appendChild() {}, scrollHeight: 0 }),
+    body: { appendChild() {}, removeChild() {} },
+    documentElement: { classList: { add: (c: string) => classes.add(c) } }
+  } as unknown as Document;
+
+  assert.equal(supportsFlexGap(noGapDoc), false);
+  applyCompatFlags(noGapDoc);
+  assert.ok(classes.has('no-flex-gap'));
+});
+
+test('a browser that honours gap is left alone', () => {
+  const classes = new Set<string>();
+  const okDoc = {
+    createElement: () => ({ style: {}, appendChild() {}, scrollHeight: 10 }),
+    body: { appendChild() {}, removeChild() {} },
+    documentElement: { classList: { add: (c: string) => classes.add(c) } }
+  } as unknown as Document;
+
+  assert.equal(supportsFlexGap(okDoc), true);
+  applyCompatFlags(okDoc);
+  assert.equal(classes.size, 0, 'no fallback class, so modern spacing is not doubled');
 });

@@ -1,3 +1,5 @@
+import { last } from '../domain/last.ts';
+
 /**
  * Preparing the shot's curves for the prompt.
  *
@@ -92,8 +94,8 @@ export function buildCurvePayload(curves: ShotCurves): Record<string, number[]> 
 
 /** Shot duration in seconds, or null when there is no usable elapsed curve. */
 export function shotDuration(elapsedS: readonly number[]): number | null {
-  const last = elapsedS.at(-1);
-  return typeof last === 'number' && Number.isFinite(last) ? Number(last.toFixed(1)) : null;
+  const value = last(elapsedS);
+  return typeof value === 'number' && Number.isFinite(value) ? Number(value.toFixed(1)) : null;
 }
 
 /** Brew ratio as the familiar "1:2.2", or null when it cannot be computed. */
