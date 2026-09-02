@@ -194,7 +194,7 @@ namespace eval ::crema::pages::crema_qa {
 		foreach {value label} $options {
 			set w [expr {$n >= 5 ? 300 : ($n == 4 ? 380 : 480)}]
 			dui add dbutton $page $x $y [expr {$x + $w}] [expr {$y + 108}] \
-				-tags opt_${group}_${value} -shape round -radius 22 \
+				-tags opt_${group}_${value} -shape round -radius 54 \
 				-fill [::theme button] -label $label -label_pos {0.5 0.5} \
 				-label_font_size 20 -label_fill [::theme button_text_dark] \
 				-command [list ::crema::pages::crema_qa::pick $group $value]
@@ -1020,7 +1020,7 @@ namespace eval ::crema::pages::crema_beans {
 		set lx 990
 		foreach {lv label} {light "Light" medium "Medium" dark "Dark"} {
 			dui add dbutton $page $lx 1230 [expr {$lx + 236}] 1320 -tags rl_$lv \
-				-shape round -radius 22 -fill [::theme button] -label $label \
+				-shape round -radius 45 -fill [::theme button] -label $label \
 				-label_pos {0.5 0.5} -label_font_size 19 -label_fill [::theme background_text] \
 				-command [list ::crema::pages::crema_beans::pick_level $lv]
 			set lx [expr {$lx + 262}]

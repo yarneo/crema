@@ -129,6 +129,19 @@ namespace eval ::crema::advisor {
 		set bean [string trim $::settings(bean_type)]
 		if {$bean eq ""} { set bean "shot" }
 		set pending_desc "$bean · $secs"
+		chime
+	}
+
+	# An audible mark at the end of a shot, the way Bestpresso does it. You are
+	# looking at the cup and the scale, not the tablet, so the moment the shot
+	# is captured and ready to rate is worth hearing.
+	#
+	# Off by setting crema_settings(shot_chime) to 0. Every call is caught:
+	# `borg` only exists on Android, and a missing beep must never be able to
+	# interfere with saving a shot.
+	proc chime {} {
+		if {[ifexists ::crema_settings(shot_chime) 1] == 0} { return }
+		catch { borg beep }
 	}
 
 	proc has_pending {} {
