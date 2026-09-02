@@ -4,7 +4,7 @@
 namespace eval ::crema::pages::crema_dashboard {
 	variable widgets; array set widgets {}
 	variable data;    array set data {}
-	variable max_rows 8
+	variable max_rows 5
 	variable row_ids {}
 	variable all_shots {}
 	variable page_off 0
@@ -32,14 +32,14 @@ namespace eval ::crema::pages::crema_dashboard {
 		set xs   {160 540 1060 1280 1500 2060 2320}
 		set i 0
 		foreach {key label} $cols {
-			dui add dtext $page [lindex $xs $i] 300 -text $label \
+			dui add dtext $page [lindex $xs $i] 700 -text $label \
 				-font_family "Mazzard Medium" -font_size 14 -fill [::theme muted] \
 				-anchor w -tags hdr_$key
 			incr i
 		}
 
 		for {set r 0} {$r < $max_rows} {incr r} {
-			set y [expr {380 + $r * 130}]
+			set y [expr {760 + $r * 130}]
 			set i 0
 			foreach key {date bean grind time inout taste stars} {
 				set fill [::theme background_text]
@@ -58,6 +58,18 @@ namespace eval ::crema::pages::crema_dashboard {
 			catch { .can bind row_${r}_tap [::dui::platform::button_press] \
 				[list ::crema::pages::crema_dashboard::open_row $r] }
 		}
+
+		# ---- dial-in trail ------------------------------------------------
+		# The one chart only this skin can draw: every other skin lists shots,
+		# which tells you what happened. Pairing each change with the score that
+		# followed it tells you whether it is working.
+		dui add shape round $page 120 270 -bwidth 2320 -bheight 390 \
+			-fill [::theme card_fill] -radius 28 -tags trail_card
+		dui add dtext $page 160 320 -text "" -tags trail_title \
+			-font_family "Mazzard SemiBold" -font_size 22 \
+			-fill [::theme background_text] -anchor w
+		dui add dtext $page 2400 320 -text "" -tags trail_hint -font_size 16 \
+			-fill [::theme muted] -anchor e
 
 		# paging - the row widgets are a fixed page of 8; these step through history
 		dui add dbutton $page 1600 1395 1980 1470 -tags dash_newer -shape outline \
@@ -83,9 +95,177 @@ namespace eval ::crema::pages::crema_dashboard {
 		::crema::history::recent 400 ::crema::pages::crema_dashboard::loaded
 	}
 
+	# ---- trail drawing ----------------------------------------------------
+	# Raw canvas items, tagged with the page so DUI hides them on the way out,
+	# and deleted before every redraw so paging cannot leave ghosts behind.
+	proc trail_clear {} {
+		catch { .can delete crema_trail }
+	}
+
+	# ifdget lives in ::crema::llm and does not resolve from this namespace;
+	# a local one keeps the trail from depending on the advisor's internals.
+	proc dget {d key {default ""}} {
+		if {[catch {dict get $d $key} v]} { return $default }
+		if {$v eq "" || $v eq "null"} { return $default }
+		return $v
+	}
+
+	# Both take a shot's PAYLOAD, not the shot: a record is
+	# {id created_at advice payload}, and everything below lives inside payload.
+	# Grind is nested one deeper still, as {grinder {setting ...}}.
+	proc trail_grind {p} {
+		if {[catch {dict get $p grinder setting} v]} { return "" }
+		return [expr {$v eq "null" ? "" : $v}]
+	}
+
+	proc trail_change {prev cur} {
+		set a [trail_grind $prev]
+		set b [trail_grind $cur]
+		if {[string is double -strict $a] && [string is double -strict $b] && abs($b - $a) >= 0.001} {
+			return [format "grind %s%.3g" [expr {$b > $a ? "+" : "-"}] [expr {abs($b - $a)}]]
+		}
+		foreach {field label} {brew_temp temp} {
+			set a [dget $prev $field]
+			set b [dget $cur $field]
+			if {![string is double -strict $a] || ![string is double -strict $b]} { continue }
+			set d [expr {$b - $a}]
+			if {abs($d) < 0.01} { continue }
+			return [format "%s %s%.3g" $label [expr {$d > 0 ? "+" : "-"}] [expr {abs($d)}]]
+		}
+		foreach {field label} {dose_g dose target_yield_g yield} {
+			set a [dget $prev $field]
+			set b [dget $cur $field]
+			if {![string is double -strict $a] || ![string is double -strict $b]} { continue }
+			if {abs($b - $a) < 0.01} { continue }
+			return [format "%s %g" $label $b]
+		}
+		set a [dget $prev profile_title]
+		set b [dget $cur profile_title]
+		if {$a ne $b && $b ne ""} { return [string range $b 0 13] }
+		return "repeat"
+	}
+
+	proc trail_score {p} {
+		set a {}
+		catch { set a [dict get $p answers] }
+		set v [dget $a enjoyment]
+		if {[string is integer -strict $v]} { return $v }
+		return ""
+	}
+
+	proc render_trail {} {
+		variable all_shots
+		set page [namespace tail [namespace current]]
+		trail_clear
+		catch { dui item config $page trail_title -text "" }
+		catch { dui item config $page trail_hint -text "" }
+		if {![llength $all_shots]} { return }
+
+		# One bean at a time: a trail across different coffees is meaningless.
+		# The newest shot's bean is the one being worked on.
+		set bean ""
+		catch { set bean [nn [dict get [lindex $all_shots 0] payload bean name]] }
+
+		set picked {}
+		foreach rec $all_shots {
+			set b ""
+			catch { set b [nn [dict get $rec payload bean name]] }
+			if {$b ne $bean || $b eq ""} { continue }
+			set pl ""
+			catch { set pl [dict get $rec payload] }
+			if {$pl eq ""} { continue }
+			lappend picked $pl
+			if {[llength $picked] >= 8} { break }
+		}
+		set picked [lreverse $picked]
+
+		catch { dui item config $page trail_title -text "Dial-in · $bean" }
+		if {[llength $picked] < 2} {
+			catch { dui item config $page trail_hint -text "needs a few rated shots" }
+			return
+		}
+
+		set rated 0
+		foreach rec $picked { if {[trail_score $rec] ne ""} { incr rated } }
+		if {$rated < 2} {
+			catch { dui item config $page trail_hint -text "rate your shots to see this" }
+			return
+		}
+		catch { dui item config $page trail_hint -text "[llength $picked] shots · score 1-5" }
+
+		set x0 300 ; set x1 2320 ; set ytop 400 ; set ybot 560
+		set n [llength $picked]
+		set step [expr {$n > 1 ? double($x1 - $x0) / ($n - 1) : 0}]
+		set sy [expr {double($ybot - $ytop) / 4.0}]
+
+		# Where a shot is worth serving. A stippled band reads as noise on a dark
+		# ground — Tk has no alpha, so a dashed guide line says the same thing
+		# without the dotty texture.
+		set y4 [expr {$ytop + $sy}]
+		.can create line [rescale_x_skin $x0] [rescale_y_skin $y4] \
+			[rescale_x_skin $x1] [rescale_y_skin $y4] \
+			-fill [::theme primary] -width 2 -dash {6 8} \
+			-tag [list $page crema_trail]
+		.can create text [rescale_x_skin $x1] [rescale_y_skin [expr {$y4 - 26}]] \
+			-text "dialled in" -fill [::theme primary] -anchor e -font Helv_6 \
+			-tag [list $page crema_trail]
+		.can create text [rescale_x_skin [expr {$x0 - 30}]] [rescale_y_skin $ytop] \
+			-text "5" -fill [::theme muted] -anchor e -font Helv_6 \
+			-tag [list $page crema_trail]
+		.can create text [rescale_x_skin [expr {$x0 - 30}]] [rescale_y_skin $ybot] \
+			-text "1" -fill [::theme muted] -anchor e -font Helv_6 \
+			-tag [list $page crema_trail]
+
+		# polyline through the rated shots only
+		set pts {}
+		set i 0
+		foreach rec $picked {
+			set sc [trail_score $rec]
+			if {$sc ne ""} {
+				lappend pts [rescale_x_skin [expr {$x0 + $i * $step}]] \
+					[rescale_y_skin [expr {$ybot - ($sc - 1) * $sy}]]
+			}
+			incr i
+		}
+		if {[llength $pts] >= 4} {
+			.can create line {*}$pts -fill [::theme accent] -width 5 -smooth 1 \
+				-tag [list $page crema_trail]
+		}
+
+		set prev "" ; set prev_score "" ; set i 0
+		foreach rec $picked {
+			set cx [expr {$x0 + $i * $step}]
+			set sc [trail_score $rec]
+
+			if {$sc ne ""} {
+				set colour [::theme muted]
+				if {$prev_score ne ""} {
+					if {$sc > $prev_score} { set colour [::theme primary] }
+					if {$sc < $prev_score} { set colour [::theme weight] }
+				}
+				set cy [expr {$ybot - ($sc - 1) * $sy}]
+				set r 14
+				set fill [expr {$sc >= 4 ? [::theme accent] : [::theme card_fill]}]
+				.can create oval [rescale_x_skin [expr {$cx - $r}]] [rescale_y_skin [expr {$cy - $r}]] \
+					[rescale_x_skin [expr {$cx + $r}]] [rescale_y_skin [expr {$cy + $r}]] \
+					-fill $fill -outline $colour -width 4 -tag [list $page crema_trail]
+				set prev_score $sc
+			}
+
+			set lbl [expr {$prev eq "" ? "start" : [trail_change $prev $rec]}]
+			.can create text [rescale_x_skin $cx] [rescale_y_skin 620] \
+				-text $lbl -fill [expr {$lbl in {start repeat} ? [::theme muted] : [::theme accent]}] \
+				-anchor center -font Helv_7 -tag [list $page crema_trail]
+
+			set prev $rec
+			incr i
+		}
+	}
+
 	proc clear {} {
 		variable max_rows
 		set page [namespace tail [namespace current]]
+		trail_clear
 		for {set r 0} {$r < $max_rows} {incr r} {
 			foreach key {date bean grind time inout taste stars advice} {
 				catch { dui item config $page row_${r}_$key -text "" }
@@ -108,6 +288,7 @@ namespace eval ::crema::pages::crema_dashboard {
 				set page_off [expr {(($total - 1) / $max_rows) * $max_rows}]
 			}
 			render [lrange $all_shots $page_off [expr {$page_off + $max_rows - 1}]]
+			catch { render_trail }
 			if {$total > 0} {
 				set from [expr {$page_off + 1}]
 				set to [expr {min($page_off + $max_rows, $total)}]
