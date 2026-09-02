@@ -307,6 +307,14 @@ namespace eval ::crema::pages::crema_home {
 		return $d
 	}
 
+	# One glanceable readout, the thing every good skin has and this one did not:
+	# while idle it answers "is the machine ready" without a tap — group and
+	# steam temperature, water left, and the scale if one is awake. During a
+	# shot it gets out of the way and shows the shot instead.
+	#
+	# Each value is fetched under its own catch: a DE1 that has not reported
+	# steam yet, or a scale that is asleep, must drop that one field rather than
+	# blank the whole line.
 	proc status_text {} {
 		set state "ready"
 		catch { set state [::de1::state::current_state] }
@@ -317,9 +325,39 @@ namespace eval ::crema::pages::crema_home {
 			catch { if {$::de1(scale_weight) > 0.4} { set w "  ·  [format %.1f $::de1(scale_weight)]g" } }
 			return "[translate $state]  $secs$w"
 		}
-		set txt ""
-		catch { set txt "water [water_tank_level_to_milliliters $::de1(water_level)] mL" }
-		return $txt
+
+		set parts {}
+
+		# Group temperature is the one that says "ready to pull". Below ~80C the
+		# machine is still coming up, so say so in words rather than a number
+		# nobody has to interpret.
+		catch {
+			set t $::de1(head_temperature)
+			if {[string is double -strict $t] && $t > 0} {
+				if {$t < 80} {
+					lappend parts "heating [format %.0f $t]°C"
+				} else {
+					lappend parts "group [format %.1f $t]°C"
+				}
+			}
+		}
+		catch {
+			set t $::de1(steam_heater_temperature)
+			if {[string is double -strict $t] && $t > 0} { lappend parts "steam [format %.0f $t]°C" }
+		}
+		catch {
+			set ml [water_tank_level_to_milliliters $::de1(water_level)]
+			if {[string is double -strict $ml]} { lappend parts "water [format %.0f $ml] mL" }
+		}
+		# Only when a scale is actually reporting; a dead scale should leave no
+		# trace rather than sit at a permanent 0.0g.
+		catch {
+			set w $::de1(scale_weight)
+			if {[string is double -strict $w] && $w > 0.4} { lappend parts "scale [format %.1f $w]g" }
+		}
+
+		if {![llength $parts]} { return "" }
+		return [join $parts "  ·  "]
 	}
 
 	# advisor states -> one chip: quiet while thinking, accent when ready
