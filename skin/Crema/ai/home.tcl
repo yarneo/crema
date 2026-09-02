@@ -37,9 +37,24 @@ namespace eval ::crema::pages::crema_home {
 		# a 'variable' item (vs dtext) is load-bearing: pages with zero
 		# variable items get no DUI update_vars ticks, and those ticks also
 		# drive the desktop simulator's espresso data feed
-		dui add variable $page 1280 100 -tags home_status -font_size 20 \
-			-fill [::theme muted] -anchor center -justify center \
+		dui add variable $page 420 100 -tags home_status -font_size 20 \
+			-fill [::theme muted] -anchor w -justify left \
 			-textvariable {[::crema::pages::crema_home::status_text]}
+
+		# Connection pills, the pattern OverDose uses. Whether the machine and
+		# scale are actually talking is the first thing you want to know and the
+		# thing a readout of numbers hides: a stale temperature looks exactly
+		# like a live one.
+		dui add shape round $page 1700 62 -bwidth 250 -bheight 76 -radius 26 \
+			-fill [::theme button] -tags pill_de1_bg
+		dui add variable $page 1825 100 -tags pill_de1 -font_size 15 \
+			-fill [::theme muted] -anchor center -justify center \
+			-textvariable {[::crema::pages::crema_home::pill_text de1]}
+		dui add shape round $page 1975 62 -bwidth 250 -bheight 76 -radius 26 \
+			-fill [::theme button] -tags pill_scale_bg
+		dui add variable $page 2100 100 -tags pill_scale -font_size 15 \
+			-fill [::theme muted] -anchor center -justify center \
+			-textvariable {[::crema::pages::crema_home::pill_text scale]}
 		dui add dbutton $page 2280 50 2460 150 -tags home_sleep -shape outline \
 			-outline [::theme card_outline] -arc_offset 30 -label "Sleep" \
 			-label_pos {0.5 0.5} -label_font_size 16 -label_fill [::theme muted] \
@@ -305,6 +320,29 @@ namespace eval ::crema::pages::crema_home {
 		set d ""
 		catch { set d $::settings(current_frame_description) }
 		return $d
+	}
+
+	# The pills say connected or not; the strip beside them says what the
+	# numbers are. Colour is set alongside the text because a DUI variable item
+	# can only carry the string.
+	proc pill_text {which} {
+		set page crema_home
+		if {$which eq "de1"} {
+			set on 0
+			catch { set on [expr {[ifexists ::de1(device_handle) 0] != 0}] }
+			set label [expr {$on ? "machine" : "no machine"}]
+		} else {
+			set on 0
+			catch { set on [expr {[ifexists ::de1(scale_device_handle) 0] != 0}] }
+			set label [expr {$on ? "scale" : "no scale"}]
+		}
+		catch {
+			dui item config $page pill_${which} -fill \
+				[expr {$on ? [::theme accent] : [::theme muted]}]
+			dui item config $page pill_${which}_bg -fill \
+				[expr {$on ? [::theme card_fill] : [::theme button]}]
+		}
+		return $label
 	}
 
 	# One glanceable readout, the thing every good skin has and this one did not:
