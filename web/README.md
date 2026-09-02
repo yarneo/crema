@@ -68,7 +68,8 @@ provable without hardware.
 - [x] Recipe model and the advice diff, including held fields ([#9](https://github.com/yarneo/crema/issues/9))
 - [x] Convergence trail ([#11](https://github.com/yarneo/crema/issues/11))
 - [x] Attempt log, so the advisor knows what already failed ([#8](https://github.com/yarneo/crema/issues/8))
-- [ ] Structured advice schema with evidence windows ([#10](https://github.com/yarneo/crema/issues/10))
+- [x] Structured advice schema with evidence windows, tolerant parsing ([#10](https://github.com/yarneo/crema/issues/10))
+- [x] Profile authorship parsing, and the grind rules ported from Tcl
 - [ ] Gateway client (REST + WebSocket)
 - [ ] Provider clients: Anthropic, OpenAI, OpenAI-compatible, Mac server
 - [ ] Views, and apply/undo against `/api/v1/workflow` ([#7](https://github.com/yarneo/crema/issues/7))
