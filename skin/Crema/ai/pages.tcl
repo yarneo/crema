@@ -352,10 +352,16 @@ namespace eval ::crema::pages::crema_advice {
 
 		# Undo sits beside Apply and appears only once Apply has run. It shares no
 		# slot with adv_fixsetup, which only exists in the error state.
-		dui add dbutton $page 680 1300 1200 1440 -tags adv_undo -shape round -radius 32 \
-			-initial_state hidden -fill [::theme card] -label "Undo" -label_pos {0.5 0.5} \
+		# Same outline treatment as adv_fixsetup: this page's established
+		# secondary-button style, so Undo cannot be mistaken for the primary
+		# action. (An earlier draft used `[::theme card]`, which is not a theme
+		# key — ::theme returns empty for an unknown one rather than erroring,
+		# so it would have rendered an unfilled button and looked like a bug.)
+		dui add dbutton $page 680 1300 1200 1440 -tags adv_undo -shape outline \
+			-initial_state hidden -outline [::theme card_outline] -arc_offset 32 \
+			-label "Undo" -label_pos {0.5 0.5} \
 			-label_font_family "Mazzard SemiBold" -label_font_size 24 \
-			-label_fill [::theme button_text_dark] \
+			-label_fill [::theme background_text] \
 			-command ::crema::pages::crema_advice::undo_press
 
 		# shown only in the error state (same slot as Apply, never both at once)
