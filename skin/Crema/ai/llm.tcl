@@ -701,6 +701,7 @@ proc ::crema::llm::build_prompt {p previous {rebuttal ""}} {
 	}
 
 	set hist [history_lines $previous]
+	set attempts [attempt_lines $previous]
 
 	# reconsider turn: the barista disagreed with the advice we just gave
 	set reconsider ""
@@ -746,6 +747,7 @@ What tastes tell you about EXTRACTION (read these as evidence, do NOT map a tast
 
 ## Recent shots with this bean (oldest first)
 $hist
+$attempts
 
 ## Your toolkit - pick what THIS shot actually needs; do not default to grind
 - Grind: primary lever for extraction rate; small, converging moves only.
@@ -779,6 +781,74 @@ proc ::crema::llm::ifdget {d key default} {
 	if {[catch { dict get $d $key } v]} { return $default }
 	if {$v eq "" || $v eq "null"} { return $default }
 	return $v
+}
+
+# ---- what we already tried on this bean, and how it went ----------------
+# history_lines shows each shot's settings and score, which lets the model
+# INFER what changed - but inferring it is exactly what a weaker model gets
+# wrong, and it will happily re-suggest a lever that already made things
+# worse. So the deltas are computed here and stated outright, paired with the
+# direction the score then moved.
+#
+# Only shots that changed something AND earned a score are attempts: a repeat
+# teaches nothing about a lever, and an unrated shot has no outcome. An
+# unrated shot in the middle does not break the chain - the next scored shot
+# is still compared against the last scored one.
+proc ::crema::llm::attempt_lines {previous} {
+	if {[llength $previous] < 2} { return "" }
+
+	set prev ""
+	set prev_score ""
+	set out {}
+
+	# previous is newest-first; walk it oldest-first
+	foreach rec [lreverse $previous] {
+		set a {}
+		catch { set a [dict get $rec answers] }
+		set score [ifdget $a enjoyment ""]
+
+		if {$prev ne ""} {
+			set changes {}
+
+			foreach {field label} {grinder_setting grind dose_g dose target_yield_g yield brew_temp temp} {
+				set was [ifdget $prev $field ""]
+				set now [ifdget $rec  $field ""]
+				if {![string is double -strict $was] || ![string is double -strict $now]} { continue }
+				set delta [expr {$now - $was}]
+				# ignore float noise and unchanged values
+				if {abs($delta) < 0.01} { continue }
+				if {$label in {grind temp}} {
+					lappend changes [format "%s %s%.2g" $label [expr {$delta > 0 ? "+" : "-"}] [expr {abs($delta)}]]
+				} else {
+					lappend changes [format "%s %g" $label $now]
+				}
+			}
+
+			set was_p [ifdget $prev profile_title ""]
+			set now_p [ifdget $rec  profile_title ""]
+			if {$was_p ne $now_p && $now_p ne ""} { lappend changes "profile $now_p" }
+
+			if {[llength $changes] && [string is double -strict $score]} {
+				if {[string is double -strict $prev_score]} {
+					if {$score > $prev_score} { set outcome "better" } elseif {$score < $prev_score} { set outcome "worse" } else { set outcome "no change" }
+					set from $prev_score
+				} else {
+					set outcome "no earlier score"
+					set from "?"
+				}
+				lappend out "- [join $changes { + }] -> score $from to $score ($outcome)"
+			}
+		}
+
+		set prev $rec
+		if {[string is double -strict $score]} { set prev_score $score }
+	}
+
+	if {![llength $out]} { return "" }
+
+	return "## ALREADY TRIED on this bean (oldest first)
+Do NOT repeat a change that made it worse. If a lever moved the score up, consider continuing in that direction rather than switching levers.
+[join [lrange $out end-5 end] "\n"]"
 }
 
 proc ::crema::llm::history_lines {previous} {
