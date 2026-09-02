@@ -350,6 +350,14 @@ namespace eval ::crema::pages::crema_advice {
 			-label_fill [::theme accent_text] \
 			-command ::crema::pages::crema_advice::primary_press
 
+		# Undo sits beside Apply and appears only once Apply has run. It shares no
+		# slot with adv_fixsetup, which only exists in the error state.
+		dui add dbutton $page 680 1300 1200 1440 -tags adv_undo -shape round -radius 32 \
+			-initial_state hidden -fill [::theme card] -label "Undo" -label_pos {0.5 0.5} \
+			-label_font_family "Mazzard SemiBold" -label_font_size 24 \
+			-label_fill [::theme button_text_dark] \
+			-command ::crema::pages::crema_advice::undo_press
+
 		# shown only in the error state (same slot as Apply, never both at once)
 		dui add dbutton $page 120 1300 640 1440 -tags adv_retry -shape round -radius 32 \
 			-initial_state hidden -fill [::theme accent] -label "Try again" -label_pos {0.5 0.5} \
@@ -434,6 +442,7 @@ namespace eval ::crema::pages::crema_advice {
 		set status $::crema::advisor::status
 
 		setvis $page adv_apply_all 0
+		catch { setvis $page adv_undo 0 }
 		setvis $page adv_retry 0
 		setvis $page adv_fixsetup 0
 		setvis $page adv_starter 0
@@ -565,7 +574,28 @@ namespace eval ::crema::pages::crema_advice {
 		}
 	}
 
+	# Put the machine back where it was before Apply. One-shot: the button hides
+	# itself again so a second press cannot re-apply a stale snapshot over
+	# something changed by hand since.
+	proc undo_press {} {
+		set page [namespace tail [namespace current]]
+		if {[catch { ::crema::advisor::undo_last_apply } ok]} {
+			msg -ERROR "crema: undo failed: $ok"
+			catch { dui item config $page adv_status -text "Undo failed - see the log" }
+			return
+		}
+		catch { setvis $page adv_undo 0 }
+		variable primary_mode
+		set primary_mode "apply"
+		catch { setlabel $page adv_apply_all "Apply" }
+		catch { dui item config $page adv_status \
+			-text [expr {$ok ? {Undone - back to your previous settings} : {Nothing to undo}}] }
+	}
+
 	proc apply_all {} {
+		# Before anything moves: Apply can change grind, dose, yield, every
+		# step's temperature and the profile in one press.
+		catch { ::crema::advisor::capture_undo }
 		set a ::crema::advisor::advice
 		# capture the grind delta BEFORE anything (a profile switch could move
 		# grinder_setting) so the status line is right
@@ -596,6 +626,7 @@ namespace eval ::crema::pages::crema_advice {
 		variable primary_mode
 		set primary_mode "done"
 		setlabel $page adv_apply_all "Applied"
+		catch { setvis $page adv_undo 1 }
 		# snapshot the applied dial-in onto this bean so a starting point (which has
 		# no shot to restore from) survives switching beans and coming back
 		catch { ::crema::advisor::persist_bean_dialin }
