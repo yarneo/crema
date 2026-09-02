@@ -949,12 +949,17 @@ namespace eval ::crema::pages::crema_beans {
 			-text "GRIND · [::crema::grinder_label]" }
 	}
 
+	# A field, not a form box. The entry itself was already borderless; what read
+	# as a form was the 1px highlight rectangle around it. A rounded card behind
+	# it, added first so the entry draws on top, makes it match the bean cards
+	# and the grind card either side of it.
 	proc entry_row {page x y width label var} {
 		dui add dtext $page $x [expr {$y - 46}] -text [string toupper $label] \
 			-font_family "Mazzard Medium" -font_size 13 -fill [::theme muted] -anchor w
+		dui add shape round $page [expr {$x - 18}] [expr {$y - 12}] \
+			-bwidth [expr {$width + 36}] -bheight 70 -radius 20 -fill [::theme card_fill]
 		dui add entry $page $x $y -canvas_width $width -font_size 22 \
-			-textvariable $var -borderwidth 0 -relief flat -highlightthickness 1 \
-			-highlightcolor [::theme accent] -highlightbackground [::theme card_outline] \
+			-textvariable $var -borderwidth 0 -relief flat -highlightthickness 0 \
 			-bg [::theme card_fill] -foreground [::theme background_text] \
 			-insertbackground [::theme accent]
 	}
