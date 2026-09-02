@@ -10,6 +10,10 @@ catch { blt::vector create crema_hist_weight }
 catch { blt::vector create crema_cmp_time }
 catch { blt::vector create crema_cmp_pressure }
 catch { blt::vector create crema_cmp_flow }
+# Temperature, plotted at a tenth of its value so it shares the 0-12 axis with
+# pressure and flow — the convention every DE1 chart uses.
+catch { blt::vector create crema_hist_temp }
+catch { blt::vector create crema_cmp_temp }
 
 namespace eval ::crema::pages::crema_shot {
 	variable widgets; array set widgets {}
@@ -70,6 +74,10 @@ namespace eval ::crema::pages::crema_shot {
 				-ydata crema_cmp_flow -symbol none -label "" \
 				-linewidth [rescale_x_skin 4] -color [::theme dim] \
 				-smooth $::settings(live_graph_smoothing_technique) -pixels 0
+			$widget element create cmp_temp -xdata crema_cmp_time \
+				-ydata crema_cmp_temp -symbol none -label "" \
+				-linewidth [rescale_x_skin 4] -color [::theme dim] \
+				-smooth $::settings(live_graph_smoothing_technique) -pixels 0
 			$widget element create hist_weight -xdata crema_hist_time \
 				-ydata crema_hist_weight -symbol none -label "" \
 				-linewidth [rescale_x_skin 6] -color [::theme weight] \
@@ -81,6 +89,14 @@ namespace eval ::crema::pages::crema_shot {
 			$widget element create hist_pressure -xdata crema_hist_time \
 				-ydata crema_hist_pressure -symbol none -label "" \
 				-linewidth [rescale_x_skin 8] -color [::theme primary] \
+				-smooth $::settings(live_graph_smoothing_technique) -pixels 0
+			# Basket temperature. It reads roughly 20C under the water, so it is
+			# kept out of the advisor's prompt — but for comparing two shots it
+			# is exactly what shows how the puck behaved, which is what the
+			# forum request was actually about.
+			$widget element create hist_temp -xdata crema_hist_time \
+				-ydata crema_hist_temp -symbol none -label "" \
+				-linewidth [rescale_x_skin 5] -color [::theme accent] \
 				-smooth $::settings(live_graph_smoothing_technique) -pixels 0
 		} -plotbackground [::theme card_fill] -width [rescale_x_skin 2240] \
 			-height [rescale_y_skin 540] -borderwidth 0 -background [::theme card_fill] \
@@ -249,6 +265,7 @@ namespace eval ::crema::pages::crema_shot {
 		catch { crema_hist_pressure set {0} }
 		catch { crema_hist_flow set {0} }
 		catch { crema_hist_weight set {0} }
+		catch { crema_hist_temp set {0} }
 		clear_compare
 	}
 
@@ -257,10 +274,13 @@ namespace eval ::crema::pages::crema_shot {
 	proc clear_compare {} {
 		variable data
 		set data(comparing) 0
+		catch { unset data(cmp_ids) }
+		catch { unset data(cmp_idx) }
 		set page [namespace tail [namespace current]]
 		catch { crema_cmp_time set {0} }
 		catch { crema_cmp_pressure set {0} }
 		catch { crema_cmp_flow set {0} }
+		catch { crema_cmp_temp set {0} }
 		catch { dui item config $page shot_compare-lbl -text "Compare" }
 	}
 
@@ -269,40 +289,56 @@ namespace eval ::crema::pages::crema_shot {
 		catch { dui item config $page shot_compare-lbl -text $txt }
 	}
 
+	# Each press walks one shot further back through this bean's history; the
+	# press after the oldest turns the overlay off. DSx lets you pick a shot
+	# from a list, which is better on a big screen — this is the same idea in
+	# one button, and the label always says which shot you are looking at.
 	proc toggle_compare {} {
 		variable data
-		if {[ifexists data(comparing) 0]} { clear_compare; return }
+		if {[info exists data(cmp_ids)] && [llength $data(cmp_ids)]} {
+			advance_compare
+			return
+		}
 		if {![info exists data(bean)] || $data(bean) eq ""} {
 			set_compare_label "no bean"
 			return
 		}
 		set_compare_label "loading"
-		# Ask for this bean's recent shots, then pick the one immediately before
-		# the open shot. Filtering by bean matters: comparing against a
-		# different coffee tells you nothing about a change.
-		::crema::history::recent 12 ::crema::pages::crema_shot::compare_list $data(bean)
+		# Filtering by bean matters: comparing against a different coffee tells
+		# you nothing about a change you made.
+		::crema::history::recent 25 ::crema::pages::crema_shot::compare_list $data(bean)
+	}
+
+	proc advance_compare {} {
+		variable data
+		set ids [ifexists data(cmp_ids) {}]
+		set i [expr {[ifexists data(cmp_idx) -1] + 1}]
+		if {$i >= [llength $ids]} { clear_compare; return }
+		set data(cmp_idx) $i
+		set_compare_label "loading"
+		::crema::history::get [lindex $ids $i] ::crema::pages::crema_shot::compare_loaded
 	}
 
 	proc compare_list {rows} {
 		variable data
 		set mine [ifexists data(created_at) ""]
-		set prev ""
+		set ids {}
+		# rows arrive newest-first, so keeping that order walks backwards in time
 		foreach r $rows {
 			set id ""; set at ""
 			catch { set id [dict get $r id] }
 			catch { set at [dict get $r created_at] }
 			if {$id eq "" || $id eq [ifexists data(id) ""]} { continue }
-			# rows arrive newest-first, so the first one older than this shot is
-			# the one immediately before it
 			if {$mine ne "" && $at ne "" && $at >= $mine} { continue }
-			set prev $id
-			break
+			lappend ids $id
 		}
-		if {$prev eq ""} {
+		if {![llength $ids]} {
 			set_compare_label "no earlier"
 			return
 		}
-		::crema::history::get $prev ::crema::pages::crema_shot::compare_loaded
+		set data(cmp_ids) $ids
+		set data(cmp_idx) -1
+		advance_compare
 	}
 
 	proc compare_loaded {s} {
@@ -313,7 +349,9 @@ namespace eval ::crema::pages::crema_shot {
 			set elapsed [dict get $p elapsed]
 			set pres    [dict get $p pressure]
 			set flow    [dict get $p flow]
-			set T {}; set P {}; set F {}
+			set bt {}
+			catch { set bt [dict get $p basket_temp] }
+			set T {}; set P {}; set F {}; set C {}
 			for {set i 0} {$i < [llength $elapsed]} {incr i} {
 				set t [lindex $elapsed $i]
 				if {![string is double -strict $t]} { continue }
@@ -323,11 +361,14 @@ namespace eval ::crema::pages::crema_shot {
 					if {![string is double -strict $v]} { set v 0 }
 					lappend $dst $v
 				}
+				set c [lindex $bt $i]
+				lappend C [expr {[string is double -strict $c] ? $c / 10.0 : 0}]
 			}
 			if {[llength $T] < 2} { error "no usable curve" }
 			crema_cmp_time set $T
 			crema_cmp_pressure set $P
 			crema_cmp_flow set $F
+			catch { crema_cmp_temp set $C }
 			set data(comparing) 1
 			set when ""
 			catch { set when [string range [dict get $s created_at] 5 9] }
@@ -450,6 +491,9 @@ namespace eval ::crema::pages::crema_shot {
 			catch { set pres [dict get $p pressure] }
 			catch { set flow [dict get $p flow] }
 			catch { set wf [dict get $p weight_flow] }
+			set bt {}
+			catch { set bt [dict get $p basket_temp] }
+			set C {}
 			for {set i 0} {$i < [llength $elapsed]} {incr i} {
 				set t [lindex $elapsed $i]
 				if {![string is double -strict $t]} { continue }
@@ -459,12 +503,15 @@ namespace eval ::crema::pages::crema_shot {
 					if {![string is double -strict $v]} { set v 0 }
 					lappend $dst $v
 				}
+				set c [lindex $bt $i]
+				lappend C [expr {[string is double -strict $c] ? $c / 10.0 : 0}]
 			}
 			if {[llength $T] > 1} {
 				crema_hist_time set $T
 				crema_hist_pressure set $P
 				crema_hist_flow set $F
 				crema_hist_weight set $W
+				catch { crema_hist_temp set $C }
 			}
 		} err]} {
 			catch { dui item config $page shot_note -text "Could not load shot ($err)" }
