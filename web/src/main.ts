@@ -19,23 +19,23 @@ import './styles.css';
 
 import { Gateway, resolveGatewayOrigin } from './gateway/client.ts';
 import { diffToWorkflowPatch, undoPatch, workflowToRecipe } from './gateway/workflow.ts';
-import type { BeanWire, ProfileEntryWire, WorkflowPatch, WorkflowWire } from './gateway/types.ts';
+import type { BeanBatchWire, BeanWire, ProfileEntryWire, WorkflowPatch, WorkflowWire } from './gateway/types.ts';
 import { applyDiff, diffRecipe, type Recipe } from './domain/recipe.ts';
 import { buildTrail, type TrailNode, type TrailShot } from './domain/trail.ts';
 import { EMPTY_RATING, type Rating, type RatingKey } from './domain/rating.ts';
 import { analyseFlowPhases } from './advice/phases.ts';
 import { parseAdvice } from './advice/parse.ts';
 import { adviceToDiff } from './advice/proposal.ts';
-import { buildPrompt } from './advice/prompt.ts';
+import { buildPrompt, daysOffRoast } from './advice/prompt.ts';
 import { askProvider } from './advice/provider.ts';
 import type { Advice } from './advice/schema.ts';
 import type { ShotCurves } from './advice/curves.ts';
 import { LiveMonitor, toCurves, type LiveShot } from './live.ts';
-import { needsRating, newShotRecord, Store, type ShotRecord } from './store.ts';
+import { hasCurves, needsRating, newShotRecord, Store, type ShotRecord } from './store.ts';
 import {
   renderAdvice,
   renderBean,
-  renderBeans,
+  renderBeansScreen,
   renderLive,
   renderNav,
   renderProfiles,
@@ -48,6 +48,7 @@ import {
   renderTrail,
   TABS,
   type BeanRow,
+  type BatchRow,
   type ProfileRow,
   type ShotRow,
   type Tab
@@ -92,6 +93,12 @@ interface State {
   profiles: ProfileEntryWire[] | null;
   profileFilter: string;
   beans: BeanWire[] | null;
+  /** Batches of the selected bean, loaded lazily. */
+  batches: BeanBatchWire[] | null;
+  activeBeanId: string | null;
+  rebuttalOpen: boolean;
+  rebuttalText: string;
+  reconsidering: boolean;
   settings: CremaSettings;
   settingsSaved: boolean;
   storageBlocked: boolean;
@@ -118,6 +125,11 @@ const state: State = {
   profiles: null,
   profileFilter: '',
   beans: null,
+  batches: null,
+  activeBeanId: null,
+  rebuttalOpen: false,
+  rebuttalText: '',
+  reconsidering: false,
   settings: loadSettings(),
   settingsSaved: false,
   storageBlocked: false,
@@ -136,7 +148,10 @@ const sampleTrail = buildTrail(sampleTrailShots());
 // Derived
 // ---------------------------------------------------------------------------
 
-const usingSample = () => state.records.length === 0 && state.pending === null;
+// The pill must agree with what is actually on screen, so this asks the same
+// question shotChart() does: is there any real shot to draw?
+const usingSample = () =>
+  state.pending === null && !state.records.some((r) => hasCurves(r));
 
 function trailNodes(): TrailNode[] {
   if (usingSample()) return sampleTrail;
@@ -162,10 +177,23 @@ function trailNodes(): TrailNode[] {
   return buildTrail(shots);
 }
 
+/**
+ * What the "Last shot" card draws.
+ *
+ * The shot awaiting a rating wins, then the most recent stored shot that has
+ * curves, and only then the sample. Falling straight through to the sample
+ * whenever nothing was pending meant a real shot you had already rated was
+ * replaced on screen by fabricated data, which is exactly the confusion the
+ * sample pill exists to prevent.
+ */
 function shotChart(): { curves: ShotCurves; evidence: Advice['evidence'] } {
   if (state.pending) {
     return { curves: state.pending.curves, evidence: state.advice?.evidence ?? [] };
   }
+
+  const latest = state.records.find((r) => hasCurves(r));
+  if (latest?.curves) return { curves: latest.curves, evidence: [] };
+
   return { curves: sample, evidence: sampleParsed.ok ? sampleParsed.advice.evidence : [] };
 }
 
@@ -174,6 +202,29 @@ function currentBean(): { name: string | null; roaster: string | null } {
     name: state.workflow?.context?.coffeeName ?? null,
     roaster: state.workflow?.context?.coffeeRoaster ?? null
   };
+}
+
+/**
+ * The bag currently in use, resolved from the workflow's beanBatchId. Roast
+ * date lives on the batch, and it is what makes days-off-roast real rather
+ * than sampled.
+ */
+function activeBatch(): BeanBatchWire | null {
+  const id = state.workflow?.context?.beanBatchId ?? null;
+  if (id === null) return null;
+  return (state.batches ?? []).find((b) => b.id === id) ?? null;
+}
+
+function batchRows(): BatchRow[] {
+  const activeId = state.workflow?.context?.beanBatchId ?? null;
+  return (state.batches ?? []).map((batch) => ({
+    id: batch.id ?? '',
+    roastDate: batch.roastDate ?? null,
+    roastLevel: batch.roastLevel ?? null,
+    daysOffRoast: daysOffRoast(batch.roastDate ?? null),
+    weightRemaining: batch.weightRemaining ?? null,
+    active: activeId !== null && batch.id === activeId
+  }));
 }
 
 function profileRows(): ProfileRow[] {
@@ -237,7 +288,13 @@ function renderBrew(): string {
         confidence: source.confidence,
         diff: adviceToDiff(source, state.recipe),
         canUndo: state.lastApplied !== null,
-        busy: state.busy
+        busy: state.busy,
+        rebuttalOpen: state.rebuttalOpen,
+        rebuttalText: state.rebuttalText,
+        reconsidering: state.reconsidering,
+        // Only a real shot can be reconsidered: there is nothing to re-examine
+        // behind the sample.
+        canReconsider: state.pending !== null && state.advice !== null
       }
     : null;
 
@@ -247,7 +304,10 @@ function renderBrew(): string {
     : null;
 
   return `
-    ${renderBean({ name: bean.name ?? SAMPLE_BEAN.name, roastDate: usingSample() ? SAMPLE_BEAN.roastDate : null })}
+    ${renderBean({
+      name: bean.name ?? SAMPLE_BEAN.name,
+      roastDate: activeBatch()?.roastDate ?? (usingSample() ? SAMPLE_BEAN.roastDate : null)
+    })}
     ${renderRecipe(state.recipe)}
     ${state.live ? renderLive({
       pressureBar: state.live.samples.at(-1)?.pressureBar ?? 0,
@@ -277,7 +337,15 @@ function renderBody(): string {
     case 'profiles':
       return state.profiles === null ? loading('profiles') : renderProfiles(profileRows(), state.profileFilter, state.busy);
     case 'beans':
-      return state.beans === null ? loading('beans') : renderBeans(beanRows(), state.busy);
+      return state.beans === null
+        ? loading('beans')
+        : renderBeansScreen({
+            rows: beanRows(),
+            busy: state.busy,
+            activeBeanId: state.activeBeanId,
+            activeBeanName: (state.beans ?? []).find((b) => b.id === state.activeBeanId)?.name ?? null,
+            batches: state.activeBeanId === null ? null : batchRows()
+          });
     case 'shots':
       return renderShots(shotRows(), state.records.length);
     case 'setup':
@@ -396,6 +464,36 @@ const live = new LiveMonitor(gateway.wsOrigin, {
   }
 });
 
+/**
+ * The request, in one place, so a reconsider is the same request plus the
+ * pushback — not a second, subtly different one.
+ */
+function adviceRequest(record: ShotRecord, curves: ShotCurves, rebuttal?: string) {
+  const batch = activeBatch();
+
+  return {
+    bean: {
+      name: record.bean.name,
+      roaster: record.bean.roaster,
+      roastDate: batch?.roastDate ?? null,
+      roastLevel: batch?.roastLevel ?? null
+    },
+    grinder: { name: state.settings.grinderName, range: state.settings.grinderRange },
+    recipe: record.recipe,
+    curves,
+    rating: state.rating,
+    finalYieldG: record.finalYieldG,
+    trail: trailNodes(),
+    ...(rebuttal
+      ? {
+          rebuttal,
+          priorSummary: record.advice?.summary ?? '',
+          priorDiagnosis: record.advice?.diagnosis ?? ''
+        }
+      : {})
+  };
+}
+
 async function getAdvice(): Promise<void> {
   if (!state.pending || state.asking) return;
 
@@ -406,20 +504,7 @@ async function getAdvice(): Promise<void> {
   const { record, curves } = state.pending;
   record.rating = { ...state.rating };
 
-  const prompt = buildPrompt({
-    bean: {
-      name: record.bean.name,
-      roaster: record.bean.roaster,
-      roastDate: null,
-      roastLevel: null
-    },
-    grinder: { name: state.settings.grinderName, range: state.settings.grinderRange },
-    recipe: record.recipe,
-    curves,
-    rating: state.rating,
-    finalYieldG: record.finalYieldG,
-    trail: trailNodes()
-  });
+  const prompt = buildPrompt(adviceRequest(record, curves));
 
   try {
     const reply = await askProvider(state.settings, prompt);
@@ -437,6 +522,44 @@ async function getAdvice(): Promise<void> {
     state.asking = false;
     await store.saveShot(record);
     state.records = await store.readRecent();
+    render();
+  }
+}
+
+/**
+ * Push back on the advice.
+ *
+ * The prompt is told to take the objection seriously, and explicitly told not
+ * to cave just because it was challenged — a coach that folds on contact is
+ * as useless as one that never listens.
+ */
+async function reconsider(text: string): Promise<void> {
+  const rebuttal = text.trim();
+  if (!state.pending || rebuttal === '' || state.reconsidering) return;
+
+  state.reconsidering = true;
+  state.adviceError = null;
+  render();
+
+  const { record, curves } = state.pending;
+
+  try {
+    const reply = await askProvider(state.settings, buildPrompt(adviceRequest(record, curves, rebuttal)));
+    const parsed = parseAdvice(reply, { shotDurationS: curves.elapsedS.at(-1) });
+
+    if (!parsed.ok) {
+      state.adviceError = parsed.error;
+    } else {
+      state.advice = parsed.advice;
+      record.advice = { summary: parsed.advice.screenSummary, diagnosis: parsed.advice.diagnosis };
+      state.rebuttalOpen = false;
+      state.rebuttalText = '';
+    }
+  } catch (cause) {
+    state.adviceError = (cause as Error).message;
+  } finally {
+    state.reconsidering = false;
+    await store.saveShot(record);
     render();
   }
 }
@@ -503,9 +626,68 @@ async function useBean(id: string): Promise<void> {
   const bean = (state.beans ?? []).find((b) => b.id === id);
   if (!bean || !state.workflow) return;
 
-  await push({ context: { coffeeName: bean.name, coffeeRoaster: bean.roaster } }, state.workflow);
-  state.tab = 'brew';
+  state.activeBeanId = id;
+  state.batches = null;
   render();
+
+  // Load the bags first, so selecting a bean can also select its freshest one
+  // in the same step rather than leaving roast date blank.
+  let newest: BeanBatchWire | null = null;
+  try {
+    const batches = await gateway.readBatches(id);
+    state.batches = batches;
+    newest =
+      [...batches]
+        .filter((b) => !b.archived)
+        .sort((a, b) => Date.parse(b.roastDate ?? '') - Date.parse(a.roastDate ?? ''))[0] ?? null;
+  } catch (cause) {
+    state.error = (cause as Error).message;
+  }
+
+  await push(
+    {
+      context: {
+        coffeeName: bean.name,
+        coffeeRoaster: bean.roaster,
+        ...(newest?.id ? { beanBatchId: newest.id } : {})
+      }
+    },
+    state.workflow
+  );
+  render();
+}
+
+async function useBatch(id: string): Promise<void> {
+  if (!state.workflow) return;
+  await push({ context: { beanBatchId: id } }, state.workflow);
+  render();
+}
+
+async function addBatch(form: HTMLFormElement): Promise<void> {
+  if (state.activeBeanId === null) return;
+
+  const data = new FormData(form);
+  const roastDate = String(data.get('roastDate') ?? '').trim();
+  const roastLevel = String(data.get('roastLevel') ?? '').trim();
+  const weight = Number(String(data.get('weight') ?? '').trim());
+  if (roastDate === '') return;
+
+  state.busy = true;
+  render();
+  try {
+    await gateway.createBatch(state.activeBeanId, {
+      roastDate: new Date(`${roastDate}T12:00:00`).toISOString(),
+      ...(roastLevel ? { roastLevel } : {}),
+      ...(Number.isFinite(weight) && weight > 0 ? { weight } : {})
+    });
+    state.batches = await gateway.readBatches(state.activeBeanId);
+    state.error = null;
+  } catch (cause) {
+    state.error = (cause as Error).message;
+  } finally {
+    state.busy = false;
+    render();
+  }
 }
 
 async function addBean(form: HTMLFormElement): Promise<void> {
@@ -606,6 +788,18 @@ root.addEventListener('click', (event) => {
     return;
   }
 
+  if (action === 'use-batch') {
+    void useBatch(target.dataset['id'] ?? '');
+    return;
+  }
+
+  if (action === 'toggle-rebuttal') {
+    state.rebuttalOpen = !state.rebuttalOpen;
+    render();
+    if (state.rebuttalOpen) root.querySelector<HTMLTextAreaElement>('.rebuttal textarea')?.focus();
+    return;
+  }
+
   if (action === 'apply' && state.workflow) {
     const source = state.advice ?? (usingSample() && sampleParsed.ok ? sampleParsed.advice : null);
     if (!source) return;
@@ -629,10 +823,23 @@ root.addEventListener('submit', (event) => {
   event.preventDefault();
 
   if (form.dataset['action'] === 'add-bean') void addBean(form);
+  if (form.dataset['action'] === 'add-batch') void addBatch(form);
   if (form.dataset['action'] === 'save-setup') saveSetup(form);
+  if (form.dataset['action'] === 'reconsider') {
+    const text = new FormData(form).get('rebuttal');
+    void reconsider(String(text ?? ''));
+  }
 });
 
 root.addEventListener('input', (event) => {
+  const area = event.target as HTMLTextAreaElement;
+  if (area.name === 'rebuttal') {
+    // Held in state so an unrelated re-render (a snapshot arriving, say) does
+    // not wipe what is being typed.
+    state.rebuttalText = area.value;
+    return;
+  }
+
   const input = event.target as HTMLInputElement;
   if (input.dataset['action'] !== 'filter-profiles') return;
 

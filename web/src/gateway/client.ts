@@ -12,6 +12,7 @@
  */
 
 import type {
+  BeanBatchWire,
   BeanWire,
   MachineStateWire,
   ProfileEntryWire,
@@ -211,6 +212,19 @@ export class Gateway {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(bean)
+    });
+  }
+
+  readBatches(beanId: string): Promise<BeanBatchWire[]> {
+    return this.request<BeanBatchWire[]>(`/api/v1/beans/${encodeURIComponent(beanId)}/batches`);
+  }
+
+  /** Record a bag. Roast date is what makes days-off-roast real. */
+  createBatch(beanId: string, batch: BeanBatchWire): Promise<BeanBatchWire> {
+    return this.request<BeanBatchWire>(`/api/v1/beans/${encodeURIComponent(beanId)}/batches`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(batch)
     });
   }
 

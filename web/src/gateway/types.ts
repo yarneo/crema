@@ -95,3 +95,21 @@ export interface ShotPageWire {
   limit?: number;
   offset?: number;
 }
+
+/**
+ * A specific bag or roast of a bean. Roast date lives here, not on the bean,
+ * because the same coffee is bought again and again — which is exactly why
+ * days-off-roast has to come from the batch.
+ */
+export interface BeanBatchWire {
+  id?: string;
+  beanId?: string;
+  /** ISO date-time. */
+  roastDate?: string | null;
+  roastLevel?: string | null;
+  /** Grams in the bag when bought. */
+  weight?: number | null;
+  weightRemaining?: number | null;
+  frozen?: boolean;
+  archived?: boolean;
+}

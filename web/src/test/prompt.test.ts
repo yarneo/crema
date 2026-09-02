@@ -225,3 +225,51 @@ test('a truncated or malformed curve set is rejected', () => {
   assert.equal(hasCurves({ ...base, curves: { elapsedS: 'nope' } } as unknown as ShotRecord), false);
   assert.equal(hasCurves({ ...base, curves: null } as ShotRecord), false);
 });
+
+// ---- reconsider -----------------------------------------------------------
+
+test('a reconsider carries the prior advice so the model can engage with it', () => {
+  const prompt = buildPrompt(
+    {
+      ...request,
+      rebuttal: 'It was not sour, it was thin and watery',
+      priorSummary: 'Grind finer to 12.0',
+      priorDiagnosis: 'Ran fast and tasted sharp'
+    },
+    NOW
+  );
+
+  assert.match(prompt, /Grind finer to 12\.0/, 'the model must see what it said before');
+  assert.match(prompt, /Ran fast and tasted sharp/);
+  assert.match(prompt, /thin and watery/, 'and the actual objection');
+});
+
+test('a reconsider still carries the shot and the attempt log', () => {
+  // The whole point is that it is the same request plus the pushback, not a
+  // second, thinner one.
+  const prompt = buildPrompt({ ...request, rebuttal: 'too sour' }, NOW);
+  assert.match(prompt, /"pressure_bar":\[/);
+  assert.match(prompt, /ALREADY TRIED/);
+  assert.match(prompt, /Flow phases:/);
+  assert.match(prompt, /## SCHEMA/);
+});
+
+test('whitespace-only pushback is not a rebuttal', () => {
+  assert.ok(!buildPrompt({ ...request, rebuttal: '   \n ' }, NOW).includes('RECONSIDER'));
+});
+
+// ---- roast date from the batch --------------------------------------------
+
+test('roast age comes from the batch, which is where roast date lives', () => {
+  const fresh = buildPrompt({ ...request, bean: { ...request.bean, roastDate: '2026-08-31' } }, NOW);
+  assert.match(fresh, /2 days off roast/);
+
+  const old = buildPrompt({ ...request, bean: { ...request.bean, roastDate: '2026-06-02' } }, NOW);
+  assert.match(old, /92 days off roast/);
+});
+
+test('an undated bag simply omits the age rather than guessing', () => {
+  const prompt = buildPrompt({ ...request, bean: { ...request.bean, roastDate: null } }, NOW);
+  assert.ok(!prompt.includes('off roast'));
+  assert.match(prompt, /Moonwake La Estrella Gesha/, 'the bean is still named');
+});

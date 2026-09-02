@@ -132,8 +132,10 @@ provable without hardware.
 - [x] WebSocket live shot: start/end detection, curve capture, reconnect
 - [x] Rating a shot, and asking a real provider for advice on it
 - [x] Shot records in Decaid's key-value store, so they follow the user
-- [ ] Reconsider ("Ask why" / push back on the advice)
-- [ ] Bean batches and roast dates
+- [x] Reconsider: push back on the advice and have it re-examine the shot
+- [x] Bean bags with roast dates, so days-off-roast is real
+- [ ] Steam, hot water and flush controls
+- [ ] Shot detail view (replay a stored shot)
 
 Design rationale for the port and the UI direction is in the design brief; the
 ranked backlog is [issues #7–#16](https://github.com/yarneo/crema/issues).

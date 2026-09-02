@@ -123,6 +123,13 @@ export interface AdviceModel {
   diff: RecipeDiff;
   canUndo: boolean;
   busy: boolean;
+  /** True while the pushback box is open. */
+  rebuttalOpen: boolean;
+  rebuttalText: string;
+  /** True while a reconsider request is in flight. */
+  reconsidering: boolean;
+  /** Whether a shot exists to reconsider advice about. */
+  canReconsider: boolean;
 }
 
 function diffRow(label: string, from: string, to: string, why: string): string {
@@ -176,9 +183,29 @@ export function renderAdvice(model: AdviceModel | null): string {
       <div class="actions">
         <button class="btn primary" data-action="apply" ${model.busy ? 'disabled' : ''}>Use for next shot</button>
         <button class="btn" data-action="undo" ${model.canUndo && !model.busy ? '' : 'disabled'}>Undo</button>
-        <button class="btn" data-action="why">Ask why</button>
+        ${model.canReconsider ? `<button class="btn" data-action="toggle-rebuttal">${model.rebuttalOpen ? 'Never mind' : 'I disagree'}</button>` : ''}
       </div>
+      ${model.rebuttalOpen ? rebuttalBox(model) : ''}
     </section>`;
+}
+
+/**
+ * Pushing back on the advice.
+ *
+ * Framed as a disagreement rather than a "why?", because that is what it is
+ * for: the barista tasted the cup and the model did not. The prompt is told to
+ * engage with the objection and to neither cave reflexively nor repeat itself.
+ */
+function rebuttalBox(model: AdviceModel): string {
+  return `
+    <form class="rebuttal" data-action="reconsider">
+      <span class="label">What did it get wrong?</span>
+      <textarea name="rebuttal" rows="2" placeholder="e.g. it was not sour, it was thin and watery"
+        ${model.reconsidering ? 'disabled' : ''}>${escape(model.rebuttalText)}</textarea>
+      <button class="btn primary" type="submit" ${model.reconsidering ? 'disabled' : ''}>
+        ${model.reconsidering ? 'Rethinking…' : 'Reconsider'}
+      </button>
+    </form>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -390,6 +417,77 @@ export interface BeanRow {
   name: string;
   origin: string;
   active: boolean;
+}
+
+export interface BatchRow {
+  id: string;
+  roastDate: string | null;
+  roastLevel: string | null;
+  daysOffRoast: number | null;
+  weightRemaining: number | null;
+  active: boolean;
+}
+
+export interface BeansModel {
+  rows: readonly BeanRow[];
+  busy: boolean;
+  /** The bean whose batches are shown, when one is selected. */
+  activeBeanId: string | null;
+  activeBeanName: string | null;
+  batches: readonly BatchRow[] | null;
+}
+
+/**
+ * The bags of the selected bean.
+ *
+ * Roast date lives on the batch rather than the bean, so this is where
+ * days-off-roast actually comes from — and days-off-roast changes the advice,
+ * which is why it is worth the extra screen.
+ */
+function renderBatches(model: BeansModel): string {
+  if (model.activeBeanId === null) {
+    return '<p class="empty">Select a bean to record its bags and roast dates.</p>';
+  }
+  if (model.batches === null) {
+    return '<p class="empty">Loading bags…</p>';
+  }
+
+  const list = model.batches
+    .map((batch) => {
+      const age =
+        batch.daysOffRoast === null
+          ? 'no roast date'
+          : `${batch.daysOffRoast} ${batch.daysOffRoast === 1 ? 'day' : 'days'} off roast`;
+      const left = batch.weightRemaining === null ? '' : ` · ${Math.round(batch.weightRemaining)}g left`;
+      return `
+        <button class="listrow${batch.active ? ' active' : ''}" data-action="use-batch" data-id="${escape(batch.id)}" ${model.busy ? 'disabled' : ''}>
+          <span class="rowmain">${escape(batch.roastDate ? new Date(batch.roastDate).toLocaleDateString() : 'undated bag')}</span>
+          <span class="rowmeta">${escape(age)}${escape(left)}${batch.roastLevel ? ` · ${escape(batch.roastLevel)}` : ''}</span>
+          ${batch.active ? '<span class="pill ok">in use</span>' : '<span class="rowgo">use</span>'}
+        </button>`;
+    })
+    .join('');
+
+  return `
+    ${list ? `<div class="list">${list}</div>` : '<p class="empty">No bags recorded for this bean yet.</p>'}
+    <form class="addbean" data-action="add-batch">
+      <input name="roastDate" type="date" required aria-label="Roast date" />
+      <input name="roastLevel" placeholder="Roast level (optional)" />
+      <input name="weight" type="number" step="1" min="0" placeholder="Bag grams (optional)" />
+      <button class="btn primary" type="submit" ${model.busy ? 'disabled' : ''}>Add bag</button>
+    </form>`;
+}
+
+export function renderBeansScreen(model: BeansModel): string {
+  return `
+    ${renderBeans(model.rows, model.busy)}
+    <section class="card">
+      <header>
+        <h2>Bags${model.activeBeanName ? ` · ${escape(model.activeBeanName)}` : ''}</h2>
+        ${model.batches ? `<span class="label">${model.batches.length} recorded</span>` : ''}
+      </header>
+      ${renderBatches(model)}
+    </section>`;
 }
 
 export function renderBeans(rows: readonly BeanRow[], busy: boolean): string {

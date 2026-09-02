@@ -226,3 +226,13 @@ svg { display: block; width: 100%; height: auto; }
 .bignums { display: flex; gap: 40px; padding: 8px 0 4px; }
 .bignums div { display: flex; align-items: baseline; gap: 9px; }
 .bignums b { font-size: 54px; font-weight: 600; letter-spacing: -0.03em; line-height: 1; }
+
+/* ---------- reconsider ---------- */
+
+.rebuttal { display: flex; flex-direction: column; gap: 8px; margin-top: 13px; padding-top: 13px; border-top: 1px solid var(--line-soft); }
+.rebuttal textarea {
+  width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 14px; resize: vertical;
+}
+.rebuttal textarea:focus { outline: none; border-color: var(--accent); }
+.rebuttal .btn { align-self: flex-start; }
