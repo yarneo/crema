@@ -107,6 +107,29 @@ namespace eval ::crema::store {
 		return 1
 	}
 
+	# Merge a rating into a shot already on disk. A shot could only be rated in
+	# the moments after pulling it, so any shot you walked away from stayed
+	# unscored - and an unscored shot is invisible to the dial-in trail and
+	# teaches the advisor nothing.
+	proc rate {id answers} {
+		set rec [get $id]
+		if {![llength $rec]} { return 0 }
+		set before [llength [dict keys $rec]]
+		set merged [dict create]
+		catch { set merged [dict get $rec answers] }
+		foreach {k v} $answers {
+			if {$v eq "" || $v eq "null"} { continue }
+			dict set merged $k $v
+		}
+		dict set rec answers $merged
+		# never write back a record that lost fields - the file holds the curves
+		if {[llength [dict keys $rec]] < $before} {
+			msg -ERROR "crema-store: refusing to rate $id, record shrank"
+			return 0
+		}
+		return [save $rec]
+	}
+
 	proc load_one {fn} {
 		set rec [dict create]
 		# decode as UTF-8 (records hold chars like ° from the advice text);

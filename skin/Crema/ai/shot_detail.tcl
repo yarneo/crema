@@ -32,8 +32,25 @@ namespace eval ::crema::pages::crema_shot {
 			-fill [::theme background_text] -anchor nw
 		dui add dtext $page 800 190 -text "" -tags shot_date -font_size 18 \
 			-fill [::theme muted] -anchor nw
-		dui add dtext $page 2440 190 -text "" -tags shot_stars -font_size 24 \
-			-fill [::theme accent] -anchor ne
+		# Tappable score, not a read-only row of stars. Rating used to be
+		# possible only in the moments right after a shot, so any shot you
+		# walked away from stayed unscored forever - which is exactly what the
+		# dial-in trail cannot draw and the advisor cannot learn from.
+		dui add dtext $page 2440 148 -text "" -tags shot_rate_hint \
+			-font_family "Mazzard Medium" -font_size 12 \
+			-fill [::theme muted] -anchor ne
+		set rx 1952
+		for {set n 1} {$n <= 5} {incr n} {
+			dui add shape round $page $rx 180 -bwidth 88 -bheight 76 -radius 20 \
+				-fill [::theme button] -tags score_bg_$n
+			dui add dtext $page [expr {$rx + 44}] 218 -text $n -tags score_lbl_$n \
+				-font_family "Mazzard SemiBold" -font_size 22 \
+				-fill [::theme muted] -anchor center -justify center
+			dui add dbutton $page $rx 180 [expr {$rx + 88}] 256 \
+				-tags score_hit_$n -fill {} -label "" \
+				-command [list ::crema::pages::crema_shot::rate_press $n]
+			set rx [expr {$rx + 100}]
+		}
 
 		# stat chips
 		set chips {grind "GRIND" time "TIME" inout "IN › OUT" temp "TEMP" taste "TASTE"}
@@ -245,6 +262,42 @@ namespace eval ::crema::pages::crema_shot {
 		}
 	}
 
+	# paint the score row from a value ("" = not yet rated)
+	proc render_rating {score} {
+		set page [namespace tail [namespace current]]
+		catch { dui item config $page shot_rate_hint \
+			-text [expr {[string is integer -strict $score] ? "SCORE" : "HOW WAS IT?"}] }
+		for {set n 1} {$n <= 5} {incr n} {
+			set on [expr {[string is integer -strict $score] && $n == $score}]
+			catch { dui item config $page score_bg_$n \
+				-fill [expr {$on ? [::theme accent] : [::theme button]}] }
+			catch { dui item config $page score_lbl_$n \
+				-fill [expr {$on ? [::theme button_text_dark] : [::theme muted]}] }
+		}
+	}
+
+	proc rate_press {n} {
+		variable data
+		if {![info exists data(id)] || $data(id) eq ""} { return }
+		render_rating $n
+		::crema::history::rate $data(id) [list enjoyment $n] \
+			[list ::crema::pages::crema_shot::rated $n]
+	}
+
+	proc rated {n ok} {
+		variable data
+		set page [namespace tail [namespace current]]
+		if {!$ok} {
+			# put the row back the way it was rather than leave a lie on screen
+			catch { render_rating [ifexists data(score) ""] }
+			catch { dui item config $page shot_rate_hint -text "COULD NOT SAVE" }
+			return
+		}
+		set data(score) $n
+		catch { dui item config $page chip_taste -text "$n/5" }
+		render_rating $n
+	}
+
 	proc open {shot_id} {
 		variable data
 		set data(id) $shot_id
@@ -257,9 +310,13 @@ namespace eval ::crema::pages::crema_shot {
 		variable data
 		set page [namespace tail [namespace current]]
 		catch { unset data(advice) }
-		foreach t {shot_bean shot_date shot_stars shot_note} {
+		foreach t {shot_bean shot_date shot_note} {
 			catch { dui item config $page $t -text "" }
 		}
+		# blank the score row too, so the previous shot's rating cannot linger
+		# on screen while the next one loads
+		set data(score) ""
+		catch { render_rating "" }
 		foreach t {chip_grind chip_time chip_inout chip_temp chip_taste} {
 			catch { dui item config $page $t -text "-" }
 		}
@@ -506,13 +563,12 @@ namespace eval ::crema::pages::crema_shot {
 			catch { dui item config $page shot_bean -text [nn [dict get $p bean name]] }
 			catch { dui item config $page shot_date \
 				-text [string map {T "  "} [string range [dict get $s created_at] 0 15]] }
+			set data(score) ""
 			catch {
 				set e [nn [dict get $a enjoyment]]
-				if {[string is integer -strict $e]} {
-					dui item config $page shot_stars \
-						-text "[string repeat ★ $e][string repeat ☆ [expr {5 - $e}]]"
-				}
+				if {[string is integer -strict $e]} { set data(score) $e }
 			}
+			catch { render_rating $data(score) }
 
 			catch { dui item config $page chip_grind -text [nn [dict get $p grinder setting]] }
 			set d ""

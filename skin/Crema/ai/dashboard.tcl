@@ -216,8 +216,8 @@ namespace eval ::crema::pages::crema_dashboard {
 			[rescale_x_skin $x1] [rescale_y_skin $y4] \
 			-fill [::theme grid_line] -width 2 -dash {3 14} \
 			-tag [list $page crema_trail]
-		.can create text [rescale_x_skin $x1] [rescale_y_skin [expr {$y4 - 26}]] \
-			-text "dialled in" -fill [::theme muted] -anchor e -font Helv_6 \
+		.can create text [rescale_x_skin $x1] [rescale_y_skin [expr {$ytop - 34}]] \
+			-text "– –  dialled in" -fill [::theme muted] -anchor e -font Helv_6 \
 			-tag [list $page crema_trail]
 		.can create text [rescale_x_skin [expr {$x0 - 30}]] [rescale_y_skin $ytop] \
 			-text "5" -fill [::theme muted] -anchor e -font Helv_6 \
