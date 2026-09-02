@@ -129,6 +129,8 @@ namespace eval ::crema::advisor {
 		set bean [string trim $::settings(bean_type)]
 		if {$bean eq ""} { set bean "shot" }
 		set pending_desc "$bean · $secs"
+		# the home chart's idle ghost is now stale
+		catch { ::crema::pages::crema_home::ghost_invalidate }
 		chime
 	}
 

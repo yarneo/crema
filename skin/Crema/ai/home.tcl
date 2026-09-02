@@ -11,6 +11,13 @@ proc ::crema::grinder_label {} {
 	return [expr {$n eq "" ? "GRINDER" : [string toupper $n]}]
 }
 
+# Vectors for the idle "last shot" ghost. Deliberately SEPARATE from de1app's
+# live espresso_* vectors: those belong to the running shot and writing history
+# into them could confuse the next one.
+catch { blt::vector create crema_last_time }
+catch { blt::vector create crema_last_pressure }
+catch { blt::vector create crema_last_flow }
+
 namespace eval ::crema::pages::crema_home {
 	variable widgets; array set widgets {}
 	variable data;    array set data {}
@@ -142,6 +149,16 @@ namespace eval ::crema::pages::crema_home {
 			$widget axis configure y -color [::theme dim] -tickfont Helv_6 -min 0.0 \
 				-max 12 -subdivisions 5 -majorticks {0 2 4 6 8 10 12} -hide 0
 			$widget grid configure -color [::theme grid_line] -hide no -minor no
+			# The idle ghost of the last shot. Created first so the live curves
+			# always draw over it once a shot starts.
+			$widget element create crema_last_p -xdata crema_last_time \
+				-ydata crema_last_pressure -symbol none -label "" \
+				-linewidth [rescale_x_skin 4] -color [::theme dim] \
+				-smooth $::settings(live_graph_smoothing_technique) -pixels 0
+			$widget element create crema_last_f -xdata crema_last_time \
+				-ydata crema_last_flow -symbol none -label "" \
+				-linewidth [rescale_x_skin 4] -color [::theme dim] \
+				-smooth $::settings(live_graph_smoothing_technique) -pixels 0
 			$widget element create line_espresso_pressure_goal -xdata espresso_elapsed \
 				-ydata espresso_pressure_goal -symbol none -label "" \
 				-linewidth [rescale_x_skin 4] -color [::theme primary_light] \
@@ -176,6 +193,9 @@ namespace eval ::crema::pages::crema_home {
 			dui add dtext $page $lx 1242 -text $label -font_size 14 \
 				-fill [::theme muted] -anchor w
 		}
+		# right end of the legend row: says whose curve the dim trace is
+		dui add dtext $page 1940 1242 -text "" -tags home_ghost_lbl -font_size 14 \
+			-fill [::theme muted] -anchor e -justify right
 		dui add dtext $page 1220 1242 -text "– –" -font_size 14 \
 			-fill [::theme primary] -anchor w
 		dui add dtext $page 1270 1242 -text "profile target" -font_size 14 \
@@ -483,6 +503,80 @@ namespace eval ::crema::pages::crema_home {
 			-fill [expr {$ok ? [::theme muted] : [::theme accent]}] }
 	}
 
+	# ---- idle ghost curve -------------------------------------------------
+	# An empty grid with a 0-to-1 axis is the deadest thing on the main screen
+	# and reads as broken. When nothing is brewing, the last shot's curves sit
+	# there dimmed instead, so the chart always says something.
+	variable ghost_loaded 0
+
+	proc ghost_label {txt} {
+		catch { dui item config crema_home home_ghost_lbl -text $txt }
+	}
+
+	proc ghost_clear {} {
+		ghost_label ""
+		catch { crema_last_time set {0} }
+		catch { crema_last_pressure set {0} }
+		catch { crema_last_flow set {0} }
+	}
+
+	proc ghost_load {} {
+		variable ghost_loaded
+		# once per app run is enough; a new shot re-arms it via ghost_invalidate
+		if {$ghost_loaded} { return }
+		set ghost_loaded 1
+		catch { ::crema::history::recent 1 ::crema::pages::crema_home::ghost_list }
+	}
+
+	proc ghost_invalidate {} {
+		variable ghost_loaded
+		set ghost_loaded 0
+		ghost_clear
+	}
+
+	proc ghost_list {rows} {
+		if {![llength $rows]} { return }
+		set id ""
+		catch { set id [dict get [lindex $rows 0] id] }
+		if {$id eq ""} { return }
+		catch { ::crema::history::get $id ::crema::pages::crema_home::ghost_loaded_cb }
+	}
+
+	proc ghost_loaded_cb {s} {
+		if {![llength $s]} { return }
+		catch {
+			set p [dict get $s payload]
+			set el [dict get $p elapsed]
+			set pr [dict get $p pressure]
+			set fl [dict get $p flow]
+			set T {} ; set P {} ; set F {}
+			for {set i 0} {$i < [llength $el]} {incr i} {
+				set t [lindex $el $i]
+				if {![string is double -strict $t]} { continue }
+				lappend T $t
+				foreach {src dst} [list $pr P $fl F] {
+					set v [lindex $src $i]
+					if {![string is double -strict $v]} { set v 0 }
+					lappend $dst $v
+				}
+			}
+			if {[llength $T] > 1} {
+				crema_last_time set $T
+				crema_last_pressure set $P
+				crema_last_flow set $F
+				# Never let a dim curve pass for live data.
+				# created_at is "YYYY-MM-DDTHH:MM:SS"; 5..9 is the MM-DD
+				set when ""
+				catch { set when [string range [dict get $s created_at] 5 9] }
+				if {$when eq ""} {
+					ghost_label "last shot"
+				} else {
+					ghost_label "last shot · $when"
+				}
+			}
+		}
+	}
+
 	proc show {args} {
 		variable updater
 		# keep bean_sel / last_grind aligned with the live bean before anything
@@ -494,6 +588,10 @@ namespace eval ::crema::pages::crema_home {
 		after cancel $updater
 		refresh_status
 		refresh_ai_note
+		# only when idle: during a shot the live curves own the chart
+		set st ""
+		catch { set st [::de1::state::current_state] }
+		if {$st in {Espresso HotWater Steam HotWaterRinse}} { ghost_clear } else { ghost_load }
 	}
 
 	# the strip shows the freshest advice: local advisor state when we have
