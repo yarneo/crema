@@ -7,7 +7,7 @@
  */
 
 import { formatGrind } from '../domain/grind.ts';
-import { formatValue, type Recipe, type RecipeDiff } from '../domain/recipe.ts';
+import { formatValue, type Recipe, type RecipeDiff, type RecipeField } from '../domain/recipe.ts';
 import { DIALED_IN_SCORE, type TrailNode } from '../domain/trail.ts';
 import type { EvidenceWindow } from '../advice/schema.ts';
 import type { FlowPhases } from '../advice/phases.ts';
@@ -138,6 +138,43 @@ export interface AdviceModel {
   canReconsider: boolean;
 }
 
+/**
+ * The single change to shout about, phrased as an instruction.
+ *
+ * Grind wins when it moved, because it is the usual lever and the direction
+ * matters ("finer 12.0" says more than "12.4 → 12.0"). Otherwise the first
+ * change in display order leads. Null when nothing changed, so the card can
+ * say so instead of showing an empty hero.
+ */
+export function leadChange(diff: RecipeDiff): { verb: string; value: string; detail: string } | null {
+  const change = diff.changes.find((c) => c.field === 'grind') ?? diff.changes[0];
+  if (!change) return null;
+
+  if (change.field === 'grind' && typeof change.from === 'number' && typeof change.to === 'number') {
+    return {
+      verb: change.to < change.from ? 'finer' : 'coarser',
+      value: formatGrind(change.to),
+      detail: `grind · ${formatGrind(change.from)} › ${formatGrind(change.to)}`
+    };
+  }
+
+  if (change.field === 'profileTitle') {
+    return { verb: 'switch to', value: String(change.to ?? ''), detail: 'profile' };
+  }
+
+  const verbs: Partial<Record<RecipeField, string>> = {
+    doseG: 'dose',
+    targetYieldG: 'yield',
+    temperatureC: 'temp'
+  };
+
+  return {
+    verb: verbs[change.field] ?? change.label.toLowerCase(),
+    value: formatValue(change.field, change.to),
+    detail: `${change.label.toLowerCase()} · ${formatValue(change.field, change.from)} › ${formatValue(change.field, change.to)}`
+  };
+}
+
 function diffRow(label: string, from: string, to: string, why: string): string {
   return `
     <div class="drow">
@@ -177,12 +214,19 @@ export function renderAdvice(model: AdviceModel | null): string {
     .map((h) => `${h.label.toLowerCase()} ${h.field === 'grind' && typeof h.to === 'number' ? formatGrind(h.to) : formatValue(h.field, h.to)}`)
     .join(' · ');
 
+  // The Tcl skin's best idea: the instruction IS the headline, set large
+  // enough to read from across the kitchen. The per-field diff stays, but it
+  // belongs under the headline rather than being the only thing there.
+  const lead = leadChange(diff);
+
   return `
     <section class="card">
       <header>
-        <h2>${escape(model.diagnosis ? 'Running fast' : 'Advice')}</h2>
+        <h2>Dial-in advice</h2>
         <span class="label">confidence ${escape(model.confidence)}</span>
       </header>
+      ${lead ? `<div class="hero"><b>${escape(lead.verb)}</b><span>${escape(lead.value)}</span></div>
+                <div class="herosub">${escape(lead.detail)}</div>` : ''}
       <p class="diagnosis">${escape(model.diagnosis)}</p>
       ${rows || '<p class="empty">Nothing to change. Pull it again the same way.</p>'}
       ${held ? `<div class="drow"><span class="label k">Held</span><div><div class="held">${escape(held)}</div><div class="why">Deliberately unchanged, so the next shot tells us one thing cleanly.</div></div></div>` : ''}

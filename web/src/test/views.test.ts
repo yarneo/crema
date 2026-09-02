@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  leadChange,
   renderActionBar,
   renderAdvice,
   renderBeansScreen,
@@ -334,4 +335,45 @@ test('a browser that honours gap is left alone', () => {
   assert.equal(supportsFlexGap(okDoc), true);
   applyCompatFlags(okDoc);
   assert.equal(classes.size, 0, 'no fallback class, so modern spacing is not doubled');
+});
+
+// ---- the advice headline -------------------------------------------------
+
+test('a grind change leads with the direction, not just the number', () => {
+  // "12.0", not "12" — formatGrind keeps the dial's one decimal, matching the
+  // Tcl skin. The grinder is labelled that way, so the advice should be too.
+  const finer = leadChange(diffRecipe(recipe, { grind: 12.0 }));
+  assert.deepEqual(finer, { verb: 'finer', value: '12.0', detail: 'grind · 12.4 › 12.0' });
+
+  const coarser = leadChange(diffRecipe(recipe, { grind: 12.8 }));
+  assert.equal(coarser?.verb, 'coarser', 'direction is the whole point of the word');
+});
+
+test('grind leads even when other fields also moved', () => {
+  const lead = leadChange(diffRecipe(recipe, { temperatureC: 94, grind: 12.0, targetYieldG: 36 }));
+  assert.equal(lead?.verb, 'finer', 'grind is the usual lever, so it gets the headline');
+});
+
+test('without a grind change, the first change leads', () => {
+  assert.equal(leadChange(diffRecipe(recipe, { targetYieldG: 36 }))?.verb, 'yield');
+  assert.equal(leadChange(diffRecipe(recipe, { temperatureC: 94 }))?.verb, 'temp');
+});
+
+test('a profile switch reads as an instruction', () => {
+  const lead = leadChange(diffRecipe(recipe, { profileTitle: 'Blooming Espresso' }));
+  assert.equal(lead?.verb, 'switch to');
+  assert.equal(lead?.value, 'Blooming Espresso');
+});
+
+test('no change means no headline, rather than an empty one', () => {
+  assert.equal(leadChange(diffRecipe(recipe, {})), null);
+  assert.ok(!renderAdvice({ ...advice, diff: diffRecipe(recipe, {}) }).includes('class="hero"'));
+});
+
+test('the headline appears alongside the diff, not instead of it', () => {
+  const html = renderAdvice(advice);
+  assert.match(html, /class="hero"/);
+  assert.match(html, /finer/);
+  assert.match(html, /28g out in 19s/, 'the per-field reason still shows');
+  assert.match(html, /Held/, 'and so does what was deliberately not changed');
 });

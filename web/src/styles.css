@@ -8,22 +8,31 @@
  */
 
 :root {
-  --bg: #0b0f13;
-  --panel: #141b22;
-  --panel-2: #1b242d;
-  --line: #26313b;
-  --line-soft: #1e262e;
-  --ink: #e9eff5;
-  --ink-2: #b9c6d2;
-  --muted: #7e8c9b;
-  --accent: #f2a63a;
-  --accent-ink: #17110a;
-  --good: #4fba8b;
-  --bad: #e0736e;
-  --blue: #5fa8e8;
+  /* Warm, not cold.
+   *
+   * The Tcl skin's ground is a dark roasted brown and its accent is the amber
+   * of a crema-topped shot; it reads as coffee equipment rather than as a
+   * dashboard. This palette is taken from it deliberately, so the two versions
+   * of Crema are recognisably the same product. */
+  --bg: #17100e;
+  --panel: #211812;
+  --panel-2: #2c211a;
+  --line: #3a2b22;
+  --line-soft: #2b2019;
+  --ink: #f6ece3;
+  --ink-2: #dccbbc;
+  --muted: #a48b7b;
+  --accent: #f0a35e;
+  --accent-ink: #21140a;
+  --good: #3ddc97;
+  --bad: #f07d6b;
+  --blue: #4aa8f0;
 
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  /* Rounded where the platform has it: an appliance should not look like a
+   * terminal. Falls back cleanly on Android. */
+  --sans: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Segoe UI Variable",
+    "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
 
   color-scheme: dark;
 }
@@ -35,16 +44,16 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--sans);
-  font-size: 15px;
+  font-size: 17px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
 
 .label {
-  font-family: var(--mono);
-  font-size: 10px;
+  font-family: var(--sans);
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -61,13 +70,13 @@ body {
   display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
   padding: 11px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
 }
-.wordmark { font-weight: 800; letter-spacing: -0.02em; font-size: 17px; margin-right: 4px; }
+.wordmark { font-weight: 800; letter-spacing: -0.01em; font-size: 21px; color: var(--accent); margin-right: 4px; }
 .stat { display: flex; align-items: baseline; gap: 8px; }
-.stat b { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600; font-size: 14px; }
+.stat b { font-family: var(--sans); font-variant-numeric: tabular-nums; font-weight: 650; font-size: 18px; }
 .spacer { margin-left: auto; }
 
 .pill {
-  font-family: var(--mono); font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em;
+  font-family: var(--sans); font-size: 12.5px; font-weight: 600; letter-spacing: 0.06em;
   padding: 4px 9px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap;
 }
 .pill.ok   { background: rgba(79,186,139,.14); color: var(--good); border-color: rgba(79,186,139,.3); }
@@ -77,20 +86,20 @@ body {
 /* ---------- bean headline + recipe row ---------- */
 
 .bean { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 2px 4px; }
-.bean h1 { font-size: 26px; line-height: 1.1; letter-spacing: -0.02em; margin: 0; font-weight: 750; }
-.bean .age { color: var(--muted); font-size: 13px; }
+.bean h1 { font-size: 40px; line-height: 1.1; letter-spacing: -0.02em; margin: 0; font-weight: 750; }
+.bean .age { color: var(--muted); font-size: 16px; }
 
 .recipe {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
 }
-.cell { background: var(--panel); padding: 10px 13px; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.cell { background: var(--panel); padding: 12px 16px; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
 .cell .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.cell .value { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 21px; font-weight: 600; letter-spacing: -0.02em; }
-.cell .value.text { font-family: var(--sans); font-size: 15px; font-weight: 650; letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cell .value { font-family: var(--sans); font-variant-numeric: tabular-nums; font-size: 30px; font-weight: 600; letter-spacing: -0.02em; }
+.cell .value.text { font-family: var(--sans); font-size: 20px; font-weight: 650; letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .step {
-  width: 27px; height: 27px; flex: 0 0 27px; border-radius: 7px; border: 1px solid var(--line);
-  background: var(--panel-2); color: var(--ink-2); font-size: 15px; line-height: 1; cursor: pointer;
+  width: 40px; height: 40px; flex: 0 0 40px; border-radius: 7px; border: 1px solid var(--line);
+  background: var(--panel-2); color: var(--ink-2); font-size: 21px; line-height: 1; cursor: pointer;
 }
 .step:hover { border-color: var(--accent); color: var(--accent); }
 .step:active { transform: translateY(1px); }
@@ -99,27 +108,27 @@ body {
 
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 15px 17px; }
 .card > header { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin-bottom: 13px; }
-.card h2 { font-size: 15px; margin: 0; font-weight: 700; letter-spacing: -0.01em; }
+.card h2 { font-size: 20px; margin: 0; font-weight: 700; letter-spacing: -0.01em; }
 
 .columns { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 14px; align-items: start; }
 @media (max-width: 900px) { .columns { grid-template-columns: 1fr; } }
 
 /* ---------- advice diff ---------- */
 
-.diagnosis { color: var(--ink-2); font-size: 14px; margin: 0 0 13px; }
+.diagnosis { color: var(--ink-2); font-size: 17px; margin: 0 0 13px; }
 
 .drow { display: grid; grid-template-columns: 62px 1fr; gap: 14px; padding: 11px 0; border-top: 1px solid var(--line-soft); align-items: start; }
 .drow .k { padding-top: 3px; }
-.nums { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 17px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.nums { font-family: var(--sans); font-variant-numeric: tabular-nums; font-size: 24px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .was { color: var(--muted); text-decoration: line-through; }
 .arr { color: var(--muted); }
 .now { color: var(--accent); font-weight: 600; }
-.why { font-size: 12.5px; color: var(--muted); line-height: 1.45; margin-top: 4px; }
+.why { font-size: 15px; color: var(--muted); line-height: 1.45; margin-top: 4px; }
 .held { color: var(--muted); font-family: var(--mono); font-size: 12.5px; }
 
 .actions { display: flex; gap: 9px; margin-top: 15px; flex-wrap: wrap; }
 .btn {
-  font-family: var(--sans); font-size: 13.5px; font-weight: 650; padding: 9px 17px;
+  font-family: var(--sans); font-size: 16px; font-weight: 700; padding: 13px 26px;
   border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); cursor: pointer;
 }
 .btn:hover { border-color: var(--muted); }
@@ -141,14 +150,14 @@ svg { display: block; width: 100%; height: auto; }
 .trailnode { font-family: var(--mono); font-size: 10.5px; fill: var(--accent); }
 .trailnode.plain { fill: var(--muted); }
 
-.empty { color: var(--muted); font-size: 13.5px; padding: 6px 0; }
+.empty { color: var(--muted); font-size: 16px; padding: 6px 0; }
 
 /* ---------- navigation ---------- */
 
 .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
 .tab {
-  font-family: var(--sans); font-size: 13.5px; font-weight: 650; cursor: pointer;
-  padding: 8px 15px; border-radius: 8px; border: 1px solid var(--line);
+  font-family: var(--sans); font-size: 16px; font-weight: 650; cursor: pointer;
+  padding: 11px 20px; border-radius: 8px; border: 1px solid var(--line);
   background: var(--panel); color: var(--muted); position: relative;
 }
 .tab:hover { color: var(--ink-2); border-color: var(--line-soft); }
@@ -179,12 +188,12 @@ svg { display: block; width: 100%; height: auto; }
 .listrow.static { cursor: default; }
 .listrow.active { background: rgba(79,186,139,.07); }
 .rowmain { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rowmeta { grid-column: 1; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.rowmeta { grid-column: 1; font-family: var(--sans); font-size: 14px; color: var(--muted); }
 /* Both of these must be pinned to column 2: without an explicit column they
    are auto-placed into column 1 and shove the title across. */
 .rowgo { grid-column: 2; grid-row: 1 / span 2; font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: .06em; }
 .listrow .pill { grid-column: 2; grid-row: 1 / span 2; }
-.rowmain { grid-column: 1; grid-row: 1; }
+.rowmain { grid-column: 1; grid-row: 1; font-size: 17px; }
 
 /* ---------- forms ---------- */
 
@@ -211,8 +220,8 @@ svg { display: block; width: 100%; height: auto; }
 .qrow { display: grid; grid-template-columns: 62px 1fr; gap: 14px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line-soft); }
 .chips { display: flex; gap: 7px; flex-wrap: wrap; }
 .chip {
-  font-family: var(--sans); font-size: 13px; font-weight: 600; cursor: pointer;
-  padding: 7px 13px; border-radius: 999px; border: 1px solid var(--line);
+  font-family: var(--sans); font-size: 15px; font-weight: 600; cursor: pointer;
+  padding: 11px 18px; border-radius: 999px; border: 1px solid var(--line);
   background: var(--panel-2); color: var(--muted);
 }
 .chip:hover { color: var(--ink-2); border-color: var(--muted); }
@@ -244,8 +253,8 @@ svg { display: block; width: 100%; height: auto; }
   padding: 11px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
 }
 .act {
-  font-family: var(--sans); font-size: 13.5px; font-weight: 650; cursor: pointer;
-  padding: 10px 18px; border-radius: 8px; border: 1px solid var(--line);
+  font-family: var(--sans); font-size: 17px; font-weight: 700; cursor: pointer;
+  padding: 16px 26px; border-radius: 8px; border: 1px solid var(--line);
   background: var(--panel-2); color: var(--ink);
 }
 .act:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
@@ -294,3 +303,13 @@ svg { display: block; width: 100%; height: auto; }
 /* The list draws its hairlines with a 1px gap over a coloured background,
    which without gap collapses to no divider at all. */
 .no-flex-gap .list > * + * { border-top: 1px solid var(--line); }
+
+/* ---------- the advice headline ---------- */
+
+/* Borrowed from the Tcl skin, which got this right: the instruction is the
+   headline, not a row of small numbers. Readable from across a kitchen. */
+.hero { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; margin: 4px 0 2px; }
+.hero b { font-size: clamp(40px, 8vw, 62px); font-weight: 400; line-height: 1; letter-spacing: -0.02em; color: var(--accent); }
+.hero span { font-size: clamp(40px, 8vw, 62px); font-weight: 600; line-height: 1; letter-spacing: -0.02em; color: var(--accent); font-variant-numeric: tabular-nums; }
+.herosub { font-size: 14px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+.no-flex-gap .hero > * + * { margin-left: 18px; }
