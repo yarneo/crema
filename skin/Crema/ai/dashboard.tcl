@@ -198,9 +198,12 @@ namespace eval ::crema::pages::crema_dashboard {
 			catch { dui item config $page trail_hint -text "rate your shots to see this" }
 			return
 		}
-		catch { dui item config $page trail_hint -text "[llength $picked] shots · score 1-5" }
+		catch { dui item config $page trail_hint -text "[llength $picked] shots · $rated rated" }
 
-		set x0 300 ; set x1 2320 ; set ytop 400 ; set ybot 560
+		set x0 300 ; set x1 2320 ; set ytop 392 ; set ybot 556
+		# unrated shots get their own rail below the 1-5 band, so a shot you
+		# have not scored is visible as a gap rather than silently dropped
+		set yun [expr {$ybot + 52}]
 		set n [llength $picked]
 		set step [expr {$n > 1 ? double($x1 - $x0) / ($n - 1) : 0}]
 		set sy [expr {double($ybot - $ytop) / 4.0}]
@@ -211,10 +214,10 @@ namespace eval ::crema::pages::crema_dashboard {
 		set y4 [expr {$ytop + $sy}]
 		.can create line [rescale_x_skin $x0] [rescale_y_skin $y4] \
 			[rescale_x_skin $x1] [rescale_y_skin $y4] \
-			-fill [::theme primary] -width 2 -dash {6 8} \
+			-fill [::theme grid_line] -width 2 -dash {3 14} \
 			-tag [list $page crema_trail]
 		.can create text [rescale_x_skin $x1] [rescale_y_skin [expr {$y4 - 26}]] \
-			-text "dialled in" -fill [::theme primary] -anchor e -font Helv_6 \
+			-text "dialled in" -fill [::theme muted] -anchor e -font Helv_6 \
 			-tag [list $page crema_trail]
 		.can create text [rescale_x_skin [expr {$x0 - 30}]] [rescale_y_skin $ytop] \
 			-text "5" -fill [::theme muted] -anchor e -font Helv_6 \
@@ -223,20 +226,27 @@ namespace eval ::crema::pages::crema_dashboard {
 			-text "1" -fill [::theme muted] -anchor e -font Helv_6 \
 			-tag [list $page crema_trail]
 
-		# polyline through the rated shots only
-		set pts {}
+		# Segment by segment, not one smoothed polyline: an unrated shot in
+		# between is a break in the evidence, so that segment is dashed. A
+		# smooth curve through it would assert a trend we did not measure.
+		set li "" ; set ls ""
 		set i 0
 		foreach rec $picked {
 			set sc [trail_score $rec]
-			if {$sc ne ""} {
-				lappend pts [rescale_x_skin [expr {$x0 + $i * $step}]] \
-					[rescale_y_skin [expr {$ybot - ($sc - 1) * $sy}]]
+			if {$sc eq ""} { incr i ; continue }
+			if {$li ne ""} {
+				set dash {}
+				if {$i - $li > 1} { set dash [list -dash {10 10}] }
+				.can create line \
+					[rescale_x_skin [expr {$x0 + $li * $step}]] \
+					[rescale_y_skin [expr {$ybot - ($ls - 1) * $sy}]] \
+					[rescale_x_skin [expr {$x0 + $i * $step}]] \
+					[rescale_y_skin [expr {$ybot - ($sc - 1) * $sy}]] \
+					-fill [::theme accent] -width 5 {*}$dash \
+					-tag [list $page crema_trail]
 			}
+			set li $i ; set ls $sc
 			incr i
-		}
-		if {[llength $pts] >= 4} {
-			.can create line {*}$pts -fill [::theme accent] -width 5 -smooth 1 \
-				-tag [list $page crema_trail]
 		}
 
 		set prev "" ; set prev_score "" ; set i 0
@@ -257,16 +267,24 @@ namespace eval ::crema::pages::crema_dashboard {
 					[rescale_x_skin [expr {$cx + $r}]] [rescale_y_skin [expr {$cy + $r}]] \
 					-fill $fill -outline $colour -width 4 -tag [list $page crema_trail]
 				set prev_score $sc
+			} else {
+				# hollow ring on the unrated rail: the shot happened, the
+				# evidence is missing, and tapping the row below fixes that
+				set r 11
+				.can create oval [rescale_x_skin [expr {$cx - $r}]] [rescale_y_skin [expr {$yun - $r}]] \
+					[rescale_x_skin [expr {$cx + $r}]] [rescale_y_skin [expr {$yun + $r}]] \
+					-fill "" -outline [::theme muted] -width 3 -tag [list $page crema_trail]
 			}
 
 			set lbl [expr {$prev eq "" ? "start" : [trail_change $prev $rec]}]
-			.can create text [rescale_x_skin $cx] [rescale_y_skin 620] \
+			.can create text [rescale_x_skin $cx] [rescale_y_skin 636] \
 				-text $lbl -fill [expr {$lbl in {start repeat} ? [::theme muted] : [::theme accent]}] \
 				-anchor center -font Helv_7 -tag [list $page crema_trail]
 
 			set prev $rec
 			incr i
 		}
+
 	}
 
 	proc clear {} {
