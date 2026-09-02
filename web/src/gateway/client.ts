@@ -11,7 +11,7 @@
  * pending fetch looks broken in a way that is hard to diagnose from a tablet.
  */
 
-import type { WorkflowPatch, WorkflowWire } from './types.ts';
+import type { MachineStateWire, WorkflowPatch, WorkflowWire } from './types.ts';
 
 /** Decaid's API port. The skin itself is served from 3000. */
 export const GATEWAY_PORT = 8080;
@@ -153,6 +153,15 @@ export class Gateway {
   /** The current recipe, as the machine has it. */
   readWorkflow(): Promise<WorkflowWire> {
     return this.request<WorkflowWire>('/api/v1/workflow');
+  }
+
+  /**
+   * Live machine state. Throws when no machine is connected, which is a normal
+   * condition rather than a fault — callers show "not connected" and carry on,
+   * because the whole dial-in loop still works against stored shots.
+   */
+  readMachineState(): Promise<MachineStateWire> {
+    return this.request<MachineStateWire>('/api/v1/machine/state');
   }
 
   /**

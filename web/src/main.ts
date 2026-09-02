@@ -28,6 +28,8 @@ const gateway = new Gateway({
 
 interface State {
   gatewayOnline: boolean;
+  machineState: string | null;
+  groupTempC: number | null;
   workflow: WorkflowWire | null;
   recipe: Recipe;
   /** Captured before an apply so Undo can put things back exactly. */
@@ -46,6 +48,8 @@ const EMPTY_RECIPE: Recipe = {
 
 const state: State = {
   gatewayOnline: false,
+  machineState: null,
+  groupTempC: null,
   workflow: null,
   recipe: EMPTY_RECIPE,
   lastApplied: null,
@@ -75,8 +79,8 @@ function render(): void {
     <div class="app">
       ${renderStatus({
         gatewayOnline: state.gatewayOnline,
-        machineState: null,
-        groupTempC: state.recipe.temperatureC,
+        machineState: state.machineState,
+        groupTempC: state.groupTempC,
         waterMl: null,
         scaleG: null,
         demo: true
@@ -103,6 +107,17 @@ async function refresh(): Promise<void> {
     state.gatewayOnline = false;
     state.error = `${(cause as Error).message} Start Decaid, or set VITE_GATEWAY to its address.`;
   }
+  // A missing machine is normal, not a fault: the loop still works against
+  // stored shots, so this failure only clears the readout.
+  try {
+    const machine = await gateway.readMachineState();
+    state.machineState = machine.state?.state ?? null;
+    state.groupTempC = machine.groupTemperature ?? null;
+  } catch {
+    state.machineState = null;
+    state.groupTempC = null;
+  }
+
   render();
 }
 

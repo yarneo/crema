@@ -58,6 +58,39 @@ open -a Decaid          # REST on :8080, interactive API docs on :4001
 npm run dev            # then open http://localhost:5173
 ```
 
+No DE1 required. Decaid ships simulated devices, which is the right way to
+develop: it never competes with your real machine or scale for Bluetooth.
+
+```bash
+# enable a mock DE1 and a mock scale, then connect them
+curl -X POST http://localhost:8080/api/v1/settings \
+  -H 'Content-Type: application/json' -d '{"simulatedDevices":["machine","scale"]}'
+curl 'http://localhost:8080/api/v1/devices/scan?connect=true'
+curl -X PUT http://localhost:8080/api/v1/devices/connect \
+  -H 'Content-Type: application/json' -d '{"deviceId":"MockScale"}'
+```
+
+A scan also *discovers* real nearby hardware but leaves it alone; connect the
+mock ids explicitly (`MockDe1`, `MockScale`) so nothing is taken from the
+machine you actually use.
+
+### Seeing it inside the Decaid app
+
+`npm run dev` is a browser page. To run as a real installed skin, package it
+and let Decaid install it — the app's container is sandboxed, so copying files
+in by hand fails with "Operation not permitted":
+
+```bash
+npm run release:zip
+python3 -m http.server 8899 --bind 127.0.0.1 &   # serve the zip
+curl -X POST http://localhost:8080/api/v1/webui/skins/install/url \
+  -H 'Content-Type: application/json' -d '{"url":"http://127.0.0.1:8899/crema-skin.zip"}'
+curl -X PUT http://localhost:8080/api/v1/webui/skins/default \
+  -H 'Content-Type: application/json' -d '{"skinId":"crema"}'
+```
+
+Restart Decaid to load a newly-set default skin.
+
 Decaid reflects the dev-server origin in its CORS headers and allows PUT, so
 the skin can drive a gateway on another port (or another machine) while you
 work on it.

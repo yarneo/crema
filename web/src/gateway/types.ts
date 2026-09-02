@@ -42,3 +42,18 @@ export interface WorkflowPatch {
   profile?: ProfileWire;
   context?: WorkflowContextWire;
 }
+
+/**
+ * Live machine state. `state` is nested, and the mock reports the same shape
+ * as a real DE1 ("idle"/"espresso"/"steam"...), so a skin cannot tell them
+ * apart — which is the point of developing against it.
+ */
+export interface MachineStateWire {
+  timestamp?: string;
+  state?: { state?: string; substate?: string };
+  flow?: number;
+  pressure?: number;
+  groupTemperature?: number;
+  mixTemperature?: number;
+  steamTemperature?: number;
+}
