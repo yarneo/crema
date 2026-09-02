@@ -11,7 +11,15 @@
  * pending fetch looks broken in a way that is hard to diagnose from a tablet.
  */
 
-import type { MachineStateWire, WorkflowPatch, WorkflowWire } from './types.ts';
+import type {
+  BeanWire,
+  MachineStateWire,
+  ProfileEntryWire,
+  ProfileWire,
+  ShotPageWire,
+  WorkflowPatch,
+  WorkflowWire
+} from './types.ts';
 
 /** Decaid's API port. The skin itself is served from 3000. */
 export const GATEWAY_PORT = 8080;
@@ -175,5 +183,42 @@ export class Gateway {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(patch)
     });
+  }
+
+  /** Every profile the gateway knows, each wrapped with its content hash id. */
+  readProfiles(): Promise<ProfileEntryWire[]> {
+    return this.request<ProfileEntryWire[]>('/api/v1/profiles');
+  }
+
+  /**
+   * Switch profile.
+   *
+   * A switch cannot be done by name: the workflow carries the profile's own
+   * definition, so selecting one means sending its steps. That is why the
+   * recipe diff deliberately leaves profileTitle alone and routes here.
+   */
+  selectProfile(profile: ProfileWire): Promise<WorkflowWire> {
+    return this.updateWorkflow({ profile });
+  }
+
+  readBeans(): Promise<BeanWire[]> {
+    return this.request<BeanWire[]>('/api/v1/beans');
+  }
+
+  /** Roaster and name are the only required fields. */
+  createBean(bean: Partial<BeanWire> & { roaster: string; name: string }): Promise<BeanWire> {
+    return this.request<BeanWire>('/api/v1/beans', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(bean)
+    });
+  }
+
+  /**
+   * Recent shots. The list omits measurements for speed, so the curves for a
+   * single shot need a follow-up read by id.
+   */
+  readShots(limit = 25): Promise<ShotPageWire> {
+    return this.request<ShotPageWire>(`/api/v1/shots?limit=${limit}`);
   }
 }

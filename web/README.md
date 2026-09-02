@@ -45,6 +45,7 @@ Key endpoints for us: `/api/v1/workflow` (the recipe we apply),
 | `src/domain/` | Pure model: the recipe, the diff, the convergence trail |
 | `src/advice/` | Crema's brain: schema, tolerant parsing, attempt log, proposals |
 | `src/gateway/` | The Decaid client and the recipe/workflow mapping |
+| `src/ui/` | Views. Plain HTML strings, no framework runtime |
 | `src/test/` | Node tests, no browser or machine required |
 
 ## Running a gateway locally
@@ -127,7 +128,9 @@ provable without hardware.
 - [x] Flow-phase analysis: stall pressure decides grind vs profile
 - [x] First screen: status strip, recipe row, advice diff, evidence band, trail
 - [ ] Prompt assembly (wiring the pieces into one request)
-- [ ] Remaining views: shot history, setup, bean picker
+- [x] Navigation, and the screens behind it: Profiles, Beans, Shots, Setup
+- [ ] Rating a shot, and asking for advice on it (the loop end to end)
+- [ ] WebSocket live shot
 
 Design rationale for the port and the UI direction is in the design brief; the
 ranked backlog is [issues #7–#16](https://github.com/yarneo/crema/issues).

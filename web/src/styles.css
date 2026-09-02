@@ -142,3 +142,66 @@ svg { display: block; width: 100%; height: auto; }
 .trailnode.plain { fill: var(--muted); }
 
 .empty { color: var(--muted); font-size: 13.5px; padding: 6px 0; }
+
+/* ---------- navigation ---------- */
+
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tab {
+  font-family: var(--sans); font-size: 13.5px; font-weight: 650; cursor: pointer;
+  padding: 8px 15px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--muted); position: relative;
+}
+.tab:hover { color: var(--ink-2); border-color: var(--line-soft); }
+.tab.on { background: var(--panel-2); color: var(--ink); border-color: var(--muted); }
+.tab .dot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent); margin-left: 7px; vertical-align: middle;
+}
+
+/* ---------- lists ---------- */
+
+.search {
+  width: 100%; margin-bottom: 11px; padding: 9px 12px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+  font-family: var(--sans); font-size: 14px;
+}
+.search:focus { outline: none; border-color: var(--accent); }
+
+.list { display: flex; flex-direction: column; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 9px; overflow: hidden; max-height: 62vh; overflow-y: auto; }
+
+.listrow {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 14px; align-items: center;
+  width: 100%; text-align: left; padding: 11px 14px; border: 0; cursor: pointer;
+  background: var(--panel); color: var(--ink); font-family: var(--sans); font-size: 14px;
+}
+.listrow:hover:not(:disabled) { background: var(--panel-2); }
+.listrow:disabled { opacity: .5; cursor: default; }
+.listrow.static { cursor: default; }
+.listrow.active { background: rgba(79,186,139,.07); }
+.rowmain { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rowmeta { grid-column: 1; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+/* Both of these must be pinned to column 2: without an explicit column they
+   are auto-placed into column 1 and shove the title across. */
+.rowgo { grid-column: 2; grid-row: 1 / span 2; font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: .06em; }
+.listrow .pill { grid-column: 2; grid-row: 1 / span 2; }
+.rowmain { grid-column: 1; grid-row: 1; }
+
+/* ---------- forms ---------- */
+
+.addbean { display: flex; gap: 8px; margin-top: 13px; flex-wrap: wrap; }
+.addbean input {
+  flex: 1 1 130px; min-width: 0; padding: 9px 12px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+  font-family: var(--sans); font-size: 14px;
+}
+.addbean input:focus, .setup input:focus, .setup select:focus { outline: none; border-color: var(--accent); }
+
+.setup { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 13px; align-items: end; }
+.setup label { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.setup input, .setup select {
+  padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 14px; min-width: 0;
+}
+.setup .btn { justify-self: start; }
+.saved { font-family: var(--mono); font-size: 11.5px; color: var(--good); align-self: center; }
+.saved.warn { color: var(--bad); }

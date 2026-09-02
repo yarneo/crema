@@ -315,3 +315,192 @@ export function renderShot(model: ShotChartModel | null): string {
       </div>
     </section>`;
 }
+
+// ---------------------------------------------------------------------------
+// Navigation
+// ---------------------------------------------------------------------------
+
+export const TABS = ['brew', 'profiles', 'beans', 'shots', 'setup'] as const;
+export type Tab = (typeof TABS)[number];
+
+const TAB_LABELS: Record<Tab, string> = {
+  brew: 'Brew',
+  profiles: 'Profiles',
+  beans: 'Beans',
+  shots: 'Shots',
+  setup: 'Setup'
+};
+
+export function renderNav(active: Tab, needsSetup: boolean): string {
+  const items = TABS.map((tab) => {
+    const badge = tab === 'setup' && needsSetup ? '<i class="dot"></i>' : '';
+    return `<button class="tab${tab === active ? ' on' : ''}" data-action="tab" data-tab="${tab}">${TAB_LABELS[tab]}${badge}</button>`;
+  }).join('');
+  return `<nav class="tabs">${items}</nav>`;
+}
+
+// ---------------------------------------------------------------------------
+// Profiles
+// ---------------------------------------------------------------------------
+
+export interface ProfileRow {
+  id: string;
+  title: string;
+  author: string;
+  steps: number;
+  active: boolean;
+}
+
+export function renderProfiles(rows: readonly ProfileRow[], filter: string, busy: boolean): string {
+  if (rows.length === 0) {
+    return `<section class="card"><header><h2>Profiles</h2></header>
+      <p class="empty">No profiles from the gateway yet.</p></section>`;
+  }
+
+  const needle = filter.trim().toLowerCase();
+  const shown = needle ? rows.filter((r) => r.title.toLowerCase().includes(needle)) : rows;
+
+  const list = shown
+    .map(
+      (row) => `
+      <button class="listrow${row.active ? ' active' : ''}" data-action="use-profile" data-id="${escape(row.id)}" ${busy ? 'disabled' : ''}>
+        <span class="rowmain">${escape(row.title)}</span>
+        <span class="rowmeta">${escape(row.author || 'unknown')} · ${row.steps} steps</span>
+        ${row.active ? '<span class="pill ok">in use</span>' : '<span class="rowgo">use</span>'}
+      </button>`
+    )
+    .join('');
+
+  return `
+    <section class="card">
+      <header><h2>Profiles</h2><span class="label">${shown.length} of ${rows.length}</span></header>
+      <input class="search" type="search" placeholder="Search profiles" value="${escape(filter)}" data-action="filter-profiles" />
+      <div class="list">${list || '<p class="empty">Nothing matches that.</p>'}</div>
+    </section>`;
+}
+
+// ---------------------------------------------------------------------------
+// Beans
+// ---------------------------------------------------------------------------
+
+export interface BeanRow {
+  id: string;
+  roaster: string;
+  name: string;
+  origin: string;
+  active: boolean;
+}
+
+export function renderBeans(rows: readonly BeanRow[], busy: boolean): string {
+  const list = rows
+    .map(
+      (row) => `
+      <button class="listrow${row.active ? ' active' : ''}" data-action="use-bean" data-id="${escape(row.id)}" ${busy ? 'disabled' : ''}>
+        <span class="rowmain">${escape(row.name)}</span>
+        <span class="rowmeta">${escape(row.roaster)}${row.origin ? ` · ${escape(row.origin)}` : ''}</span>
+        ${row.active ? '<span class="pill ok">in use</span>' : '<span class="rowgo">use</span>'}
+      </button>`
+    )
+    .join('');
+
+  return `
+    <section class="card">
+      <header><h2>Beans</h2><span class="label">${rows.length} in the library</span></header>
+      ${list ? `<div class="list">${list}</div>` : '<p class="empty">No beans yet. Add the bag in the hopper and Crema will keep its dial-in.</p>'}
+      <form class="addbean" data-action="add-bean">
+        <input name="roaster" placeholder="Roaster" required />
+        <input name="name" placeholder="Bean" required />
+        <input name="country" placeholder="Origin (optional)" />
+        <button class="btn primary" type="submit" ${busy ? 'disabled' : ''}>Add bean</button>
+      </form>
+    </section>`;
+}
+
+// ---------------------------------------------------------------------------
+// Shots
+// ---------------------------------------------------------------------------
+
+export interface ShotRow {
+  id: string;
+  when: string;
+  profileTitle: string;
+  coffeeName: string;
+  summary: string;
+}
+
+export function renderShots(rows: readonly ShotRow[], total: number): string {
+  if (rows.length === 0) {
+    return `<section class="card"><header><h2>Shots</h2></header>
+      <p class="empty">No shots recorded yet. Pull one and it will appear here with its advice.</p></section>`;
+  }
+
+  const list = rows
+    .map(
+      (row) => `
+      <div class="listrow static">
+        <span class="rowmain">${escape(row.summary)}</span>
+        <span class="rowmeta">${escape(row.profileTitle)}${row.coffeeName ? ` · ${escape(row.coffeeName)}` : ''} · ${escape(row.when)}</span>
+      </div>`
+    )
+    .join('');
+
+  return `
+    <section class="card">
+      <header><h2>Shots</h2><span class="label">${rows.length} of ${total}</span></header>
+      <div class="list">${list}</div>
+    </section>`;
+}
+
+// ---------------------------------------------------------------------------
+// Setup
+// ---------------------------------------------------------------------------
+
+export interface SetupModel {
+  provider: string;
+  apiKey: string;
+  model: string;
+  baseUrl: string;
+  grinderName: string;
+  grinderRange: string;
+  ready: boolean;
+  saved: boolean;
+  storageBlocked: boolean;
+}
+
+const PROVIDER_LABELS: Record<string, string> = {
+  anthropic: 'Anthropic (Claude)',
+  openai: 'OpenAI (GPT)',
+  google: 'Google (Gemini)',
+  compatible: 'OpenAI-compatible (Ollama, LM Studio…)',
+  server: 'Local Mac server'
+};
+
+export function renderSetup(model: SetupModel): string {
+  const options = Object.entries(PROVIDER_LABELS)
+    .map(([id, label]) => `<option value="${id}"${id === model.provider ? ' selected' : ''}>${escape(label)}</option>`)
+    .join('');
+
+  const keyless = model.provider === 'compatible' || model.provider === 'server';
+
+  return `
+    <section class="card">
+      <header>
+        <h2>AI setup</h2>
+        <span class="pill ${model.ready ? 'ok' : 'off'}">${model.ready ? 'ready' : 'needs a key'}</span>
+      </header>
+      <p class="diagnosis">The key is stored on this device only. It goes to the provider you pick and nowhere else, never to the gateway.</p>
+      <form class="setup" data-action="save-setup">
+        <label><span class="label">Provider</span><select name="provider" data-action="change-provider">${options}</select></label>
+        <label><span class="label">API key${keyless ? ' (often not needed)' : ''}</span>
+          <input name="apiKey" type="password" autocomplete="off" placeholder="${keyless ? 'leave blank if none' : 'paste your key'}" value="${escape(model.apiKey)}" /></label>
+        <label><span class="label">Model</span><input name="model" placeholder="blank uses a sensible default" value="${escape(model.model)}" /></label>
+        <label><span class="label">Base URL</span><input name="baseUrl" placeholder="blank uses the provider default" value="${escape(model.baseUrl)}" /></label>
+        <label><span class="label">Grinder</span><input name="grinderName" placeholder="e.g. Lagom 01" value="${escape(model.grinderName)}" /></label>
+        <label><span class="label">Dial range</span><input name="grinderRange" placeholder="e.g. 0.1-0.5 (optional)" value="${escape(model.grinderRange)}" /></label>
+        <button class="btn primary" type="submit">Save</button>
+        ${model.saved ? '<span class="saved">Saved</span>' : ''}
+        ${model.storageBlocked ? '<span class="saved warn">This browser blocked storage, so settings will not persist.</span>' : ''}
+      </form>
+      <p class="why">A stronger model gives noticeably better advice. If it ever feels generic, switch to the best model your provider offers before changing anything else.</p>
+    </section>`;
+}

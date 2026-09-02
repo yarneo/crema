@@ -57,3 +57,41 @@ export interface MachineStateWire {
   mixTemperature?: number;
   steamTemperature?: number;
 }
+
+/** A profile as listed by the gateway: the definition plus its content hash. */
+export interface ProfileEntryWire {
+  id: string;
+  profile: ProfileWire;
+}
+
+/** Only the bean fields Crema reads or writes. Roaster and name are required. */
+export interface BeanWire {
+  id?: string;
+  roaster: string;
+  name: string;
+  country?: string | null;
+  region?: string | null;
+  process?: string | null;
+  roastLevel?: string | null;
+  notes?: string | null;
+  decaf?: boolean;
+  archived?: boolean;
+}
+
+/** Shot list rows. Measurements are excluded from the list for speed. */
+export interface ShotSummaryWire {
+  id: string;
+  timestamp?: string;
+  profileTitle?: string | null;
+  coffeeName?: string | null;
+  doseWeight?: number | null;
+  finalWeight?: number | null;
+  duration?: number | null;
+}
+
+export interface ShotPageWire {
+  items: ShotSummaryWire[];
+  total: number;
+  limit?: number;
+  offset?: number;
+}
