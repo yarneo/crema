@@ -13,9 +13,23 @@ source "[skin_directory]/settings.tcl"
 
 iconik_load_settings
 set ::iconik_settings(show_ghc_buttons) {}
-# Crema owns the look; the variant (dark/light) comes from crema settings
-if {[catch { array set ::crema_settings [encoding convertfrom utf-8 [read_binary_file "[skin_directory]/crema_settings.tdb"]] } _terr]} {
-	msg -ERROR "crema-theme: settings load failed: $_terr (path [skin_directory]/crema_settings.tdb)"
+# Crema owns the look; the variant (dark/light) comes from crema settings.
+# Settings live at the writable homedir root (see ::crema::settings_filename);
+# the skin dir is only the legacy pre-migration location. Reading the legacy
+# path alone meant the Settings page's light/dark choice never reached the
+# theme - it always fell through to dark - and logged an ERROR every boot.
+set _cfg_loaded 0
+foreach _cfg [list "[homedir]/crema_settings.tdb" "[skin_directory]/crema_settings.tdb"] {
+	if {![file exists $_cfg]} { continue }
+	if {[catch { array set ::crema_settings [encoding convertfrom utf-8 [read_binary_file $_cfg]] } _terr]} {
+		msg -ERROR "crema-theme: settings load failed: $_terr (path $_cfg)"
+	} else {
+		set _cfg_loaded 1
+		break
+	}
+}
+if {!$_cfg_loaded} {
+	msg -NOTICE "crema-theme: no crema_settings.tdb yet, using the dark default"
 }
 msg -INFO "crema-theme: variant='[ifexists ::crema_settings(theme_variant)]'"
 if {[ifexists ::crema_settings(theme_variant)] eq "light"} {
