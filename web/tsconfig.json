@@ -15,6 +15,7 @@
     "exactOptionalPropertyTypes": false,
     "skipLibCheck": true,
     "isolatedModules": true,
+    "erasableSyntaxOnly": true,
     "types": ["node"]
   },
   "include": ["src"]

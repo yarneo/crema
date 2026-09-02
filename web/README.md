@@ -43,7 +43,8 @@ Key endpoints for us: `/api/v1/workflow` (the recipe we apply),
 | Path | What lives there |
 |---|---|
 | `src/domain/` | Pure model: the recipe, the diff, the convergence trail |
-| `src/advice/` | Crema's brain: attempt log, prompt building, provider clients |
+| `src/advice/` | Crema's brain: schema, tolerant parsing, attempt log, proposals |
+| `src/gateway/` | The Decaid client and the recipe/workflow mapping |
 | `src/test/` | Node tests, no browser or machine required |
 
 ## Development
@@ -70,9 +71,10 @@ provable without hardware.
 - [x] Attempt log, so the advisor knows what already failed ([#8](https://github.com/yarneo/crema/issues/8))
 - [x] Structured advice schema with evidence windows, tolerant parsing ([#10](https://github.com/yarneo/crema/issues/10))
 - [x] Profile authorship parsing, and the grind rules ported from Tcl
-- [ ] Gateway client (REST + WebSocket)
+- [x] Gateway client: REST, workflow read/apply/undo, timeouts ([#7](https://github.com/yarneo/crema/issues/7))
+- [ ] WebSocket telemetry for the live shot
 - [ ] Provider clients: Anthropic, OpenAI, OpenAI-compatible, Mac server
-- [ ] Views, and apply/undo against `/api/v1/workflow` ([#7](https://github.com/yarneo/crema/issues/7))
+- [ ] Views: the three signatures, then the borrowed craft
 
 Design rationale for the port and the UI direction is in the design brief; the
 ranked backlog is [issues #7–#16](https://github.com/yarneo/crema/issues).
