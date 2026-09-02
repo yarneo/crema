@@ -71,6 +71,37 @@ export function toWebSocketOrigin(httpOrigin: string): string {
   return httpOrigin.replace(/^http(s?):/, 'ws$1:');
 }
 
+/**
+ * Decaid reports failures as a JSON body, not plain text:
+ *
+ *   HTTP 500 {"error":"DeviceNotConnectedException: machine not connected"}
+ *
+ * (verified against a live gateway). Unwrap it, and strip the exception class
+ * name, which tells a barista nothing. The most common case by far is simply
+ * that the machine is asleep or not paired, so say that.
+ */
+export function describeGatewayError(path: string, status: number, body: string): string {
+  let detail = body.trim();
+
+  try {
+    const parsed: unknown = JSON.parse(detail);
+    if (typeof parsed === 'object' && parsed !== null && typeof (parsed as { error?: unknown }).error === 'string') {
+      detail = (parsed as { error: string }).error.trim();
+    }
+  } catch {
+    // Not JSON; keep whatever text came back.
+  }
+
+  // "DeviceNotConnectedException: machine not connected" -> "machine not connected"
+  const withoutClass = detail.replace(/^[A-Za-z.]*Exception:\s*/, '');
+
+  if (/not connected/i.test(withoutClass)) {
+    return 'The machine is not connected. Wake the DE1 and check it is paired with Decaid.';
+  }
+
+  return withoutClass || `${path} failed with ${status}`;
+}
+
 export interface GatewayOptions {
   origin: string;
   fetch?: typeof globalThis.fetch;
@@ -111,9 +142,8 @@ export class Gateway {
     }
 
     if (!response.ok) {
-      // Decaid puts a useful message in the body; surface it rather than "500".
       const detail = await response.text().catch(() => '');
-      throw new GatewayError(response.status, path, detail.trim() || `${path} failed with ${response.status}`);
+      throw new GatewayError(response.status, path, describeGatewayError(path, response.status, detail));
     }
 
     if (response.status === 204) return undefined as T;

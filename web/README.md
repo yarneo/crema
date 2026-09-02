@@ -47,6 +47,16 @@ Key endpoints for us: `/api/v1/workflow` (the recipe we apply),
 | `src/gateway/` | The Decaid client and the recipe/workflow mapping |
 | `src/test/` | Node tests, no browser or machine required |
 
+## Running a gateway locally
+
+Decaid has a macOS build, so the whole stack runs on a laptop with no machine
+attached. `GET /api/v1/workflow` answers even with no DE1 connected, which is
+enough to develop the entire dial-in loop.
+
+```bash
+open -a Decaid          # REST on :8080, interactive API docs on :4001
+```
+
 ## Development
 
 ```bash
@@ -72,6 +82,7 @@ provable without hardware.
 - [x] Structured advice schema with evidence windows, tolerant parsing ([#10](https://github.com/yarneo/crema/issues/10))
 - [x] Profile authorship parsing, and the grind rules ported from Tcl
 - [x] Gateway client: REST, workflow read/apply/undo, timeouts ([#7](https://github.com/yarneo/crema/issues/7))
+- [x] Verified end to end against a live Decaid 0.8.4: apply and undo round-trip exactly
 - [ ] WebSocket telemetry for the live shot
 - [x] Provider clients: Anthropic, OpenAI, Google, OpenAI-compatible, Mac server
 - [x] Shot-curve preparation: downsampling, weight-curve gating

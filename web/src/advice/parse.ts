@@ -25,9 +25,9 @@ import {
   type GrindAdvice,
   type ProfileAdvice,
   type ProfileActionKind,
-  type ProfileStep,
   type ValueAdvice
 } from './schema.ts';
+import { readProfileStep, type ProfileStep } from '../domain/profile.ts';
 
 export interface ParseContext {
   /** Shot length in seconds, used to keep evidence windows on the chart. */
@@ -189,36 +189,12 @@ export function readEvidence(raw: unknown, durationS?: number): { windows: Evide
 // Profile
 // ---------------------------------------------------------------------------
 
-function readStep(raw: unknown): ProfileStep | null {
-  if (!isRecord(raw)) return null;
-  const name = coerceString(raw['name']);
-  if (name === '') return null;
-
-  const pump = coerceString(raw['pump']).toLowerCase() === 'flow' ? 'flow' : 'pressure';
-  const transition = coerceString(raw['transition']).toLowerCase() === 'smooth' ? 'smooth' : 'fast';
-
-  return {
-    name,
-    temperature: coerceNumber(raw['temperature']),
-    seconds: coerceNumber(raw['seconds']),
-    pump,
-    pressure: coerceNumber(raw['pressure']),
-    flow: coerceNumber(raw['flow']),
-    transition,
-    exitType: coerceString(raw['exit_type']) || null,
-    exitPressureOver: coerceNumber(raw['exit_pressure_over']),
-    exitPressureUnder: coerceNumber(raw['exit_pressure_under']),
-    exitFlowOver: coerceNumber(raw['exit_flow_over']),
-    exitFlowUnder: coerceNumber(raw['exit_flow_under'])
-  };
-}
-
 function readCreatedProfile(raw: unknown): CreatedProfile | null {
   if (!isRecord(raw)) return null;
 
   const title = coerceString(raw['title']);
   const steps = Array.isArray(raw['steps'])
-    ? raw['steps'].map(readStep).filter((s): s is ProfileStep => s !== null)
+    ? raw['steps'].map(readProfileStep).filter((s): s is ProfileStep => s !== null)
     : [];
 
   // A profile with no title or no steps cannot be written to the machine.

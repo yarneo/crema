@@ -14,34 +14,11 @@
  */
 
 import { formatGrind } from '../domain/grind.ts';
+import { profileTemperature, shiftProfileTemperature } from '../domain/profile.ts';
 import type { Recipe, RecipeDiff } from '../domain/recipe.ts';
-import type { ProfileWire, WorkflowContextWire, WorkflowPatch, WorkflowWire } from './types.ts';
+import type { WorkflowContextWire, WorkflowPatch, WorkflowWire } from './types.ts';
 
-/** The hottest step, which is the number a barista means by "brew temp". */
-export function profileTemperature(profile: ProfileWire | undefined): number | null {
-  const temps = (profile?.steps ?? [])
-    .map((step) => step.temperature)
-    .filter((t): t is number => typeof t === 'number' && Number.isFinite(t));
-
-  return temps.length === 0 ? null : Math.max(...temps);
-}
-
-/**
- * Shift every step by `deltaC`, keeping the profile's internal relationships.
- * Returns a new profile; the input is not mutated.
- */
-export function shiftProfileTemperature(profile: ProfileWire, deltaC: number): ProfileWire {
-  if (!Number.isFinite(deltaC) || deltaC === 0) return profile;
-
-  return {
-    ...profile,
-    steps: (profile.steps ?? []).map((step) =>
-      typeof step.temperature === 'number' && Number.isFinite(step.temperature)
-        ? { ...step, temperature: Number((step.temperature + deltaC).toFixed(1)) }
-        : step
-    )
-  };
-}
+export { profileTemperature, shiftProfileTemperature };
 
 /** Read the current workflow as a Crema recipe. */
 export function workflowToRecipe(workflow: WorkflowWire): Recipe {

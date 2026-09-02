@@ -13,6 +13,8 @@
  * a frontier model to a small local one.
  */
 
+import type { ProfileStep } from '../domain/profile.ts';
+
 export type Confidence = 'low' | 'medium' | 'high';
 
 export type ProfileActionKind = 'keep' | 'switch' | 'create';
@@ -44,21 +46,6 @@ export interface Actions {
   doseG: ValueAdvice;
   targetYieldG: ValueAdvice;
   temperatureC: ValueAdvice;
-}
-
-export interface ProfileStep {
-  name: string;
-  temperature: number | null;
-  seconds: number | null;
-  pump: 'pressure' | 'flow';
-  pressure: number | null;
-  flow: number | null;
-  transition: 'fast' | 'smooth';
-  exitType: string | null;
-  exitPressureOver: number | null;
-  exitPressureUnder: number | null;
-  exitFlowOver: number | null;
-  exitFlowUnder: number | null;
 }
 
 export interface CreatedProfile {
@@ -114,7 +101,7 @@ export const ADVICE_SCHEMA_TEXT = `{
   "profile": {
     "action": "keep" | "switch" | "create",
     "switch_to": <existing profile title or null>,
-    "created_profile": <null, or {"title","notes","target_weight_g","steps":[{"name","temperature","seconds","pump":"pressure"|"flow","pressure","flow","transition":"fast"|"smooth","exit_type","exit_pressure_over","exit_pressure_under","exit_flow_over","exit_flow_under"}]}>,
+    "created_profile": <null, or {"title","notes","target_weight_g","steps":[{"name","pump":"pressure"|"flow","transition":"fast"|"smooth","temperature":<C>,"seconds":<float>,"volume":<ml or 0>,"weight":<g or 0>,"sensor":"coffee","pressure":<bar, only when pump is pressure>,"flow":<ml/s, only when pump is flow>,"exit":<null or {"type":"pressure"|"flow","condition":"over"|"under","value":<float>}>}]}>,
     "reason": "<1 sentence or empty>"
   },
   "screen_summary": "<max 160 chars, imperative, what to do>"

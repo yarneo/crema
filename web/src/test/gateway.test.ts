@@ -17,10 +17,11 @@ const workflow: WorkflowWire = {
   profile: {
     version: '2',
     title: 'Gentle Decline',
+    // Shaped like a real Decaid step, verified against a live gateway 0.8.4.
     steps: [
-      { name: 'fill', temperature: 89, seconds: 8, pump: 'flow', flow: 4 },
-      { name: 'bloom', temperature: 89, seconds: 20, pump: 'flow', flow: 0.8 },
-      { name: 'extract', temperature: 92, seconds: 40, pump: 'pressure', pressure: 6 }
+      { name: 'fill', pump: 'flow', transition: 'fast', exit: { type: 'pressure', condition: 'over', value: 3 }, volume: 100, seconds: 8, weight: 0, temperature: 89, sensor: 'coffee', flow: 4, limiter: null },
+      { name: 'bloom', pump: 'flow', transition: 'fast', exit: null, volume: 100, seconds: 20, weight: 0, temperature: 89, sensor: 'coffee', flow: 0.8, limiter: null },
+      { name: 'extract', pump: 'pressure', transition: 'smooth', exit: null, volume: 0, seconds: 40, weight: 0, temperature: 92, sensor: 'coffee', pressure: 6, limiter: { value: 0, range: 0.6 } }
     ]
   },
   context: {
