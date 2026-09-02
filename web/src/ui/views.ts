@@ -24,6 +24,10 @@ const escape = (value: unknown): string =>
 // ---------------------------------------------------------------------------
 
 export interface StatusModel {
+  /** URL of Decaid's own settings dashboard, or null when unknown. */
+  settingsUrl: string | null;
+  /** True when Decaid is hosting us and can be returned to. */
+  canExit: boolean;
   gatewayOnline: boolean;
   machineState: string | null;
   groupTempC: number | null;
@@ -54,6 +58,8 @@ export function renderStatus(model: StatusModel): string {
       ${stat('scale', model.scaleG === null ? '—' : `${model.scaleG.toFixed(1)} g`)}
       <span class="spacer"></span>
       ${pills}
+      ${model.settingsUrl ? `<a class="statlink" href="${escape(model.settingsUrl)}">Machine setup</a>` : ''}
+      ${model.canExit ? '<button class="statlink" data-action="exit-skin">Dashboard</button>' : ''}
     </div>`;
 }
 

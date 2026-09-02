@@ -7,6 +7,7 @@ import {
   renderBeansScreen,
   renderRating,
   renderShots,
+  renderStatus,
   renderWater,
   type AdviceModel,
   type BeansModel
@@ -166,6 +167,40 @@ test('one day reads as a day, not 1 days', () => {
     batches: [{ id: 'x3', roastDate: '2026-09-01T09:00:00.000Z', roastLevel: null, daysOffRoast: 1, weightRemaining: null, active: false }]
   });
   assert.match(html, /1 day off roast/);
+});
+
+// ---- ways out of the skin ------------------------------------------------
+
+test('the status bar links to machine setup and back to the dashboard', () => {
+  const html = renderStatus({
+    settingsUrl: 'http://localhost:8080/api/v1/plugins/settings.reaplugin/ui?backName=Crema',
+    canExit: true,
+    gatewayOnline: true,
+    machineState: 'idle',
+    groupTempC: 93,
+    waterMl: null,
+    scaleG: null,
+    demo: false
+  });
+  assert.match(html, /Machine setup/);
+  assert.match(html, /backName=Crema/, 'so Decaid offers a way back to us');
+  assert.match(html, /data-action="exit-skin"/);
+});
+
+test('no dashboard button outside Decaid, where there is nothing to return to', () => {
+  const html = renderStatus({
+    settingsUrl: null,
+    canExit: false,
+    gatewayOnline: true,
+    machineState: null,
+    groupTempC: null,
+    waterMl: null,
+    scaleG: null,
+    demo: true
+  });
+  assert.ok(!html.includes('exit-skin'));
+  assert.ok(!html.includes('Machine setup'));
+  assert.match(html, /sample shot/);
 });
 
 // ---- machine action bar ---------------------------------------------------

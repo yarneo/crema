@@ -428,6 +428,11 @@ function render(): void {
   root.innerHTML = `
     <div class="app">
       ${renderStatus({
+        // Decaid's own settings dashboard, so machine setup, scales and skin
+        // switching are one tap away rather than requiring a swipe people do
+        // not know about. The forum is full of "how do I get back?".
+        settingsUrl: `${gateway.httpOrigin}/api/v1/plugins/settings.reaplugin/ui?backName=Crema`,
+        canExit: typeof window.decentApp?.exitToDashboard === 'function',
         gatewayOnline: state.gatewayOnline,
         machineState: state.machineState,
         groupTempC: state.groupTempC,
@@ -956,6 +961,13 @@ root.addEventListener('click', (event) => {
 
   if (action === 'use-batch') {
     void useBatch(target.dataset['id'] ?? '');
+    return;
+  }
+
+  if (action === 'exit-skin') {
+    // Only present when Decaid injected the API, but guard anyway: a stale
+    // page can outlive the script that defined it.
+    window.decentApp?.exitToDashboard?.();
     return;
   }
 

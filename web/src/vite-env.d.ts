@@ -8,3 +8,15 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/**
+ * Injected by Decaid when it serves the skin (see /__decent/skin-api.js).
+ * Absent in a plain browser or under `vite dev`, so always feature-detect.
+ */
+interface DecentApp {
+  exitToDashboard?: () => void;
+}
+
+interface Window {
+  decentApp?: DecentApp;
+}

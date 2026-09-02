@@ -252,3 +252,12 @@ svg { display: block; width: 100%; height: auto; }
 .act:disabled { opacity: .4; cursor: default; }
 .act.stop { background: var(--bad); border-color: var(--bad); color: #1a0f0f; font-size: 15px; padding: 11px 30px; }
 .actnote { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: .06em; }
+
+/* ---------- links out of the skin ---------- */
+
+.statlink {
+  font-family: var(--mono); font-size: 10.5px; font-weight: 600; letter-spacing: .06em;
+  padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line);
+  background: transparent; color: var(--muted); cursor: pointer; text-decoration: none;
+}
+.statlink:hover { color: var(--ink); border-color: var(--muted); }
