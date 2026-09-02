@@ -55,7 +55,12 @@ enough to develop the entire dial-in loop.
 
 ```bash
 open -a Decaid          # REST on :8080, interactive API docs on :4001
+npm run dev            # then open http://localhost:5173
 ```
+
+Decaid reflects the dev-server origin in its CORS headers and allows PUT, so
+the skin can drive a gateway on another port (or another machine) while you
+work on it.
 
 ## Development
 
@@ -86,8 +91,10 @@ provable without hardware.
 - [ ] WebSocket telemetry for the live shot
 - [x] Provider clients: Anthropic, OpenAI, Google, OpenAI-compatible, Mac server
 - [x] Shot-curve preparation: downsampling, weight-curve gating
-- [ ] Prompt assembly, including the flow-phase analysis
-- [ ] Views: the three signatures, then the borrowed craft
+- [x] Flow-phase analysis: stall pressure decides grind vs profile
+- [x] First screen: status strip, recipe row, advice diff, evidence band, trail
+- [ ] Prompt assembly (wiring the pieces into one request)
+- [ ] Remaining views: shot history, setup, bean picker
 
 Design rationale for the port and the UI direction is in the design brief; the
 ranked backlog is [issues #7–#16](https://github.com/yarneo/crema/issues).
