@@ -6,6 +6,7 @@
 import logging
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from . import claude_client, prompting, store
 
@@ -13,6 +14,24 @@ log = logging.getLogger("advisor")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 app = FastAPI(title="decent-advisor")
+
+# The Decent.app version of the skin is a web page, so it reaches this server
+# through the browser's fetch and is subject to CORS. Without this the request
+# is refused before it is sent, and the skin can only report "unreachable".
+#
+# Allowing any origin is deliberate and safe here: this server binds to a LAN
+# address, holds no credentials a page could steal (the Claude token is used
+# server-side and never returned), and has no cookie or session auth for a
+# hostile page to ride on. It is the tablet-and-laptop equivalent of a local
+# development server.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=".*",
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 store.init_db()
 
 

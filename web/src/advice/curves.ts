@@ -50,14 +50,16 @@ export function isWeightCurveTrustworthy(weightFlow: readonly number[] | null | 
   return peak > MIN_PLAUSIBLE_WEIGHT_FLOW && peak < MAX_PLAUSIBLE_WEIGHT_FLOW;
 }
 
+/** Read-only, because every consumer only reads: it lets a live shot, a
+ *  stored shot and the sample all satisfy the same type without copying. */
 export interface ShotCurves {
-  elapsedS: number[];
-  pressureBar: number[];
-  flowMlS: number[];
-  weightFlow?: number[] | null;
+  elapsedS: readonly number[];
+  pressureBar: readonly number[];
+  flowMlS: readonly number[];
+  weightFlow?: readonly number[] | null;
   /** What the profile intended. Absent on shots captured before we stored it. */
-  pressureGoal?: number[] | null;
-  flowGoal?: number[] | null;
+  pressureGoal?: readonly number[] | null;
+  flowGoal?: readonly number[] | null;
 }
 
 /**

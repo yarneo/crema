@@ -12,6 +12,7 @@ import { DIALED_IN_SCORE, type TrailNode } from '../domain/trail.ts';
 import type { EvidenceWindow } from '../advice/schema.ts';
 import type { FlowPhases } from '../advice/phases.ts';
 import { stallVerdict } from '../advice/phases.ts';
+import { RATING_QUESTIONS, SCORES, type Rating } from '../domain/rating.ts';
 
 const escape = (value: unknown): string =>
   String(value ?? '').replace(/[&<>"']/g, (c) =>
@@ -502,5 +503,80 @@ export function renderSetup(model: SetupModel): string {
         ${model.storageBlocked ? '<span class="saved warn">This browser blocked storage, so settings will not persist.</span>' : ''}
       </form>
       <p class="why">A stronger model gives noticeably better advice. If it ever feels generic, switch to the best model your provider offers before changing anything else.</p>
+    </section>`;
+}
+
+// ---------------------------------------------------------------------------
+// Rating the shot
+// ---------------------------------------------------------------------------
+
+export interface RatingModel {
+  rating: Rating;
+  /** Null until a shot has actually been pulled. */
+  shotSummary: string | null;
+  asking: boolean;
+  error: string | null;
+  ready: boolean;
+}
+
+export function renderRating(model: RatingModel): string {
+  if (model.shotSummary === null) {
+    return `<section class="card"><header><h2>How was that shot?</h2></header>
+      <p class="empty">Pull a shot and the questionnaire opens here. Four taps and a score.</p></section>`;
+  }
+
+  const groups = RATING_QUESTIONS.map((question) => {
+    const chosen = model.rating[question.key];
+    const chips = question.options
+      .map(
+        (option) =>
+          `<button class="chip${option === chosen ? ' on' : ''}" data-action="rate" data-key="${question.key}" data-value="${escape(option)}">${escape(option)}</button>`
+      )
+      .join('');
+    return `<div class="qrow"><span class="label">${escape(question.label)}</span><div class="chips">${chips}</div></div>`;
+  }).join('');
+
+  const scores = SCORES.map(
+    (score) =>
+      `<button class="chip score${score === model.rating.score ? ' on' : ''}" data-action="rate" data-key="score" data-value="${score}">${score}</button>`
+  ).join('');
+
+  return `
+    <section class="card">
+      <header>
+        <h2>How was that shot?</h2>
+        <span class="label">${escape(model.shotSummary)}</span>
+      </header>
+      ${groups}
+      <div class="qrow"><span class="label">Score</span><div class="chips">${scores}</div></div>
+      ${model.error ? `<p class="why err">${escape(model.error)}</p>` : ''}
+      <div class="actions">
+        <button class="btn primary" data-action="get-advice" ${model.asking || model.rating.score === null ? 'disabled' : ''}>
+          ${model.asking ? 'Asking…' : 'Get advice'}
+        </button>
+        ${model.ready ? '' : '<span class="saved warn">Add an API key in Setup first.</span>'}
+      </div>
+    </section>`;
+}
+
+// ---------------------------------------------------------------------------
+// Live shot
+// ---------------------------------------------------------------------------
+
+export interface LiveModel {
+  pressureBar: number;
+  flowMlS: number;
+  elapsedS: number;
+}
+
+/** One giant number while a shot runs, readable from across a kitchen. */
+export function renderLive(model: LiveModel): string {
+  return `
+    <section class="card live">
+      <header><h2>Pulling</h2><span class="label">${model.elapsedS.toFixed(1)}s</span></header>
+      <div class="bignums">
+        <div><b class="num">${model.pressureBar.toFixed(1)}</b><span class="label">bar</span></div>
+        <div><b class="num">${model.flowMlS.toFixed(1)}</b><span class="label">ml/s</span></div>
+      </div>
     </section>`;
 }

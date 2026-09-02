@@ -39,6 +39,52 @@ class ClaudeError(RuntimeError):
     pass
 
 
+def _describe_failure(returncode: int, stderr: str, stdout: str) -> str:
+    """Explain why the CLI failed, in a way that names the likely fix.
+
+    A non-zero exit with *nothing* on either stream is almost always missing
+    headless auth: run under launchd there is no login session and, on macOS,
+    no Keychain access either, so `claude` cannot find its credentials and
+    gives up silently. Saying "exited 1:" and nothing else sends people
+    looking in the wrong place, so the hint is spelled out.
+    """
+    detail = (stderr or "").strip()
+
+    # A failure that still emitted the JSON envelope has a readable story in it,
+    # and dumping the whole envelope hides it. Zero tokens in and out means the
+    # CLI never actually reached the model — usually a usage limit or expired
+    # auth, not a problem with the prompt.
+    if not detail and stdout:
+        try:
+            envelope = json.loads(stdout)
+        except json.JSONDecodeError:
+            envelope = None
+
+        if isinstance(envelope, dict):
+            usage = envelope.get("usage") or {}
+            if not usage.get("input_tokens") and not usage.get("output_tokens"):
+                return (
+                    f"claude exited {returncode} without reaching the model "
+                    "(zero tokens used). Check `claude -p 'hi'` in a terminal: "
+                    "the usual causes are a usage limit or expired credentials. "
+                    "For headless use run `claude setup-token` and put "
+                    "CLAUDE_CODE_OAUTH_TOKEN=... in server/.env."
+                )
+            if envelope.get("result"):
+                return f"claude exited {returncode}: {str(envelope['result'])[:400]}"
+
+        detail = stdout.strip()
+
+    if detail:
+        return f"claude exited {returncode}: {detail[:500]}"
+
+    return (
+        f"claude exited {returncode} with no output. It is probably not "
+        "authenticated for headless use: run `claude setup-token` and put "
+        "CLAUDE_CODE_OAUTH_TOKEN=... in server/.env, then restart the service."
+    )
+
+
 def ask_text(prompt: str, timeout: int = 240) -> str:
     """Run claude -p and return its raw text reply (for the provider mocks)."""
     claude = find_claude()
@@ -50,7 +96,7 @@ def ask_text(prompt: str, timeout: int = 240) -> str:
         env={**os.environ, "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "8000"},
     )
     if result.returncode != 0:
-        raise ClaudeError(f"claude exited {result.returncode}: {result.stderr[:500]}")
+        raise ClaudeError(_describe_failure(result.returncode, result.stderr, result.stdout))
     try:
         return json.loads(result.stdout).get("result", "")
     except json.JSONDecodeError:
@@ -71,7 +117,7 @@ def ask_json(prompt: str, timeout: int = 240) -> dict:
         env={**os.environ, "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "8000"},
     )
     if result.returncode != 0:
-        raise ClaudeError(f"claude exited {result.returncode}: {result.stderr[:500]}")
+        raise ClaudeError(_describe_failure(result.returncode, result.stderr, result.stdout))
 
     try:
         envelope = json.loads(result.stdout)

@@ -6,6 +6,7 @@ import {
   buildRequest,
   describeHttpError,
   endpointFor,
+  extractErrorDetail,
   extractReplyText,
   isConfigured,
   isReasoningModel,
@@ -223,4 +224,32 @@ test('the API key goes on the provider request and nowhere else', () => {
   assert.ok(!request.body.includes('sk-secret'), 'the key is never in the request body');
   assert.ok(request.url.startsWith('https://api.anthropic.com'), 'and never in a query string');
   assert.equal(Object.values(request.headers).filter((v) => v.includes('sk-secret')).length, 1);
+});
+
+// ---- self-hosted failures surface their own detail ------------------------
+
+test('a self-hosted 500 shows the servers own reason, not a generic line', () => {
+  // Verbatim from the Mac server when the claude CLI is not authenticated.
+  const body = '{"detail":"claude exited 1 with no output. It is probably not authenticated for headless use"}';
+  const message = describeHttpError('server', 500, body);
+
+  assert.match(message, /not authenticated for headless use/);
+  assert.ok(!/having trouble at its end/.test(message), 'the generic line would hide the only useful clue');
+});
+
+test('a hosted providers 500 stays generic, because its body is noise', () => {
+  assert.match(describeHttpError('openai', 500, '{"error":{"message":"internal"}}'), /trouble at its end/);
+});
+
+test('error details are pulled from either envelope shape', () => {
+  assert.equal(extractErrorDetail('{"detail":"a"}'), 'a');
+  assert.equal(extractErrorDetail('{"error":"b"}'), 'b');
+  assert.equal(extractErrorDetail('{"error":{"message":"c"}}'), 'c');
+  assert.equal(extractErrorDetail('plain text'), 'plain text');
+  assert.equal(extractErrorDetail(''), '');
+  assert.equal(extractErrorDetail('   '), '');
+});
+
+test('a detail-less self-hosted 500 still says what happened', () => {
+  assert.match(describeHttpError('server', 503, ''), /HTTP 503 with no detail/);
 });

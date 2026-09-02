@@ -129,8 +129,11 @@ provable without hardware.
 - [x] First screen: status strip, recipe row, advice diff, evidence band, trail
 - [ ] Prompt assembly (wiring the pieces into one request)
 - [x] Navigation, and the screens behind it: Profiles, Beans, Shots, Setup
-- [ ] Rating a shot, and asking for advice on it (the loop end to end)
-- [ ] WebSocket live shot
+- [x] WebSocket live shot: start/end detection, curve capture, reconnect
+- [x] Rating a shot, and asking a real provider for advice on it
+- [x] Shot records in Decaid's key-value store, so they follow the user
+- [ ] Reconsider ("Ask why" / push back on the advice)
+- [ ] Bean batches and roast dates
 
 Design rationale for the port and the UI direction is in the design brief; the
 ranked backlog is [issues #7–#16](https://github.com/yarneo/crema/issues).

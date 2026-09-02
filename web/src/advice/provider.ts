@@ -192,8 +192,47 @@ export class ProviderError extends Error {
  * The status codes mean much the same thing across Anthropic, OpenAI and the
  * compatible endpoints, and a bare "HTTP 401" on a tablet at 6am helps nobody.
  */
+/**
+ * Pull the human part out of an error body.
+ *
+ * FastAPI (our Mac server) uses `{"detail": "..."}`; the hosted providers use
+ * `{"error": {"message": "..."}}`. Either way there is usually one sentence
+ * worth showing.
+ */
+export function extractErrorDetail(body: string): string {
+  const text = body.trim();
+  if (text === '') return '';
+
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (typeof parsed === 'object' && parsed !== null) {
+      const record = parsed as Record<string, unknown>;
+      if (typeof record['detail'] === 'string') return record['detail'].trim();
+      const error = record['error'];
+      if (typeof error === 'string') return error.trim();
+      if (typeof error === 'object' && error !== null) {
+        const message = (error as Record<string, unknown>)['message'];
+        if (typeof message === 'string') return message.trim();
+      }
+    }
+  } catch {
+    // Not JSON; the raw text is the best we have.
+  }
+
+  return text.slice(0, 300);
+}
+
 export function describeHttpError(provider: ProviderId, status: number, body: string): string {
   const name = provider === 'server' ? 'The Mac server' : provider[0]!.toUpperCase() + provider.slice(1);
+  const selfHosted = provider === 'server' || provider === 'compatible';
+
+  // For something the user runs themselves, the body is the diagnosis and a
+  // generic "having trouble at its end" actively hides it. Their own logs are
+  // the only place the real reason lives, so put it on screen.
+  if (selfHosted && status >= 500) {
+    const detail = extractErrorDetail(body);
+    return detail ? `${name} failed: ${detail}` : `${name} returned HTTP ${status} with no detail.`;
+  }
 
   switch (status) {
     case 400:
