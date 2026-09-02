@@ -42,6 +42,21 @@ namespace eval ::crema::store {
 		# metal-sensor reading that runs much cooler and must NOT be read as brew temp
 		dict set rec brew_temp [ifexists ::settings(espresso_temperature) ""]
 
+		# The profile's STEP NAMES, in order. Stored so a shot's graph can be
+		# banded and labelled after the fact - "wet | bloom | rise | hold |
+		# decline" - which is what turns a curve from a squiggle into something
+		# you can read. Names only: the boundaries are recovered from the goal
+		# curves, which are already captured below, so this stays small.
+		set pnames {}
+		catch {
+			foreach step [ifexists ::settings(advanced_shot) {}] {
+				set nm ""
+				catch { set nm [dict get $step name] }
+				lappend pnames $nm
+			}
+		}
+		dict set rec profile_steps $pnames
+
 		# curves from the BLT vectors. pressure_goal/flow_goal are the profile's
 		# INTENDED curves - capturing them lets the advisor read intended-vs-actual
 		# (did the machine hit the profile?) instead of guessing the profile shape.

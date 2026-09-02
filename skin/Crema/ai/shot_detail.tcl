@@ -59,6 +59,10 @@ namespace eval ::crema::pages::crema_shot {
 			-outline [::theme card_outline] -width 2 -arc_offset 28
 
 		add_de1_widget crema_shot graph 160 480 {
+			# Keep the widget path: BLT markers are the only sane way to annotate
+			# this graph, because they are placed in DATA coordinates and need no
+			# pixel maths, but they must be created later, per shot.
+			set ::crema::pages::crema_shot::graph $widget
 			$widget axis configure x -color [::theme dim] -tickfont Helv_6
 			$widget axis configure y -color [::theme dim] -tickfont Helv_6 -min 0.0 \
 				-max 12 -subdivisions 5 -majorticks {0 2 4 6 8 10 12} -hide 0
@@ -266,7 +270,107 @@ namespace eval ::crema::pages::crema_shot {
 		catch { crema_hist_flow set {0} }
 		catch { crema_hist_weight set {0} }
 		catch { crema_hist_temp set {0} }
+		bands_clear
 		clear_compare
+	}
+
+	# ---- stage bands ------------------------------------------------------
+	# A curve is a squiggle until you can see where the profile changed its
+	# mind. The step boundaries are recovered from the goal curves rather than
+	# stored: the profile drives EITHER pressure or flow at any moment, so a
+	# switch between them, or a jump in the target, is a real boundary. A smooth
+	# ramp moves the target every sample but only slightly, which is what
+	# separates a ramp from a step.
+	variable graph ""
+
+	proc bands_clear {} {
+		variable graph
+		if {$graph eq ""} { return }
+		catch {
+			foreach m [$graph marker names "crema_band*"] { $graph marker delete $m }
+		}
+	}
+
+	# Which variable the profile is driving at sample i, and its target.
+	proc band_regime {pg fg i} {
+		set p [lindex $pg $i] ; set f [lindex $fg $i]
+		if {[string is double -strict $p] && $p > 0} { return [list p $p] }
+		if {[string is double -strict $f] && $f > 0} { return [list f $f] }
+		return [list - 0]
+	}
+
+	proc band_bounds {el pg fg} {
+		set n [llength $el]
+		if {[llength $pg] < $n} { set n [llength $pg] }
+		if {[llength $fg] < $n} { set n [llength $fg] }
+		if {$n < 4} { return {} }
+
+		set out {0}
+		for {set i 1} {$i < $n} {incr i} {
+			lassign [band_regime $pg $fg [expr {$i - 1}]] r0 t0
+			lassign [band_regime $pg $fg $i] r1 t1
+			if {$r1 ne $r0} { lappend out $i ; continue }
+			# per-sample threshold: a step jumps, a ramp creeps
+			set lim [expr {$r1 eq "p" ? 0.4 : 0.7}]
+			if {abs($t1 - $t0) > $lim} { lappend out $i }
+		}
+
+		# boundaries closer than half a second are ramp jitter, not steps
+		set merged [list [lindex $out 0]]
+		foreach b [lrange $out 1 end] {
+			set prev [lindex $merged end]
+			if {[lindex $el $b] - [lindex $el $prev] >= 0.5} { lappend merged $b }
+		}
+		return $merged
+	}
+
+	proc band_label {pg fg i names idx} {
+		# Prefer the profile's own step names when the shot stored them AND the
+		# count lines up; otherwise say what the profile was actually doing,
+		# which is more use than "step 3".
+		if {[llength $names] > 0 && [llength $names] == [llength $::crema::pages::crema_shot::band_starts]} {
+			set nm [lindex $names $idx]
+			if {$nm ne ""} { return [string tolower [string range $nm 0 11]] }
+		}
+		lassign [band_regime $pg $fg $i] r t
+		switch -- $r {
+			p { return [format "%.1f bar" $t] }
+			f { return [format "%.1f ml/s" $t] }
+			default { return "preinfuse" }
+		}
+	}
+
+	variable band_starts {}
+
+	proc render_bands {el pg fg names} {
+		variable graph
+		variable band_starts
+		bands_clear
+		if {$graph eq ""} { return }
+
+		set band_starts [band_bounds $el $pg $fg]
+		if {[llength $band_starts] < 2} { return }
+
+		set i 0
+		foreach b $band_starts {
+			set t [lindex $el $b]
+			if {![string is double -strict $t]} { incr i ; continue }
+			# the first boundary sits on the y axis; a line there is just noise
+			if {$i > 0} {
+				catch {
+					$graph marker create line -coords [list $t 0 $t 12] \
+						-outline [::theme dim] -dashes {2 6} -linewidth 1 \
+						-name "crema_band_l$i" -under 1
+				}
+			}
+			catch {
+				$graph marker create text -coords [list $t 11.4] \
+					-text " [band_label $pg $fg $b $names $i]" -anchor w \
+					-foreground [::theme muted] -font Helv_6 \
+					-name "crema_band_t$i" -under 1
+			}
+			incr i
+		}
 	}
 
 	# ---- comparison overlay -----------------------------------------------
@@ -512,6 +616,12 @@ namespace eval ::crema::pages::crema_shot {
 				crema_hist_flow set $F
 				crema_hist_weight set $W
 				catch { crema_hist_temp set $C }
+				set names {}
+				catch { set names [dict get $p profile_steps] }
+				set pg {} ; set fg {}
+				catch { set pg [dict get $p pressure_goal] }
+				catch { set fg [dict get $p flow_goal] }
+				catch { render_bands $elapsed $pg $fg $names }
 			}
 		} err]} {
 			catch { dui item config $page shot_note -text "Could not load shot ($err)" }
