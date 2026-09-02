@@ -6,6 +6,10 @@ catch { blt::vector create crema_hist_time }
 catch { blt::vector create crema_hist_pressure }
 catch { blt::vector create crema_hist_flow }
 catch { blt::vector create crema_hist_weight }
+# the comparison overlay's own vectors; BLT does not create these implicitly
+catch { blt::vector create crema_cmp_time }
+catch { blt::vector create crema_cmp_pressure }
+catch { blt::vector create crema_cmp_flow }
 
 namespace eval ::crema::pages::crema_shot {
 	variable widgets; array set widgets {}
@@ -55,6 +59,17 @@ namespace eval ::crema::pages::crema_shot {
 			$widget axis configure y -color [::theme dim] -tickfont Helv_6 -min 0.0 \
 				-max 12 -subdivisions 5 -majorticks {0 2 4 6 8 10 12} -hide 0
 			$widget grid configure -color [::theme grid_line] -hide no -minor no
+			# Comparison overlay, created FIRST so it draws beneath the real
+			# curves: the shot you opened must stay the subject, with the older
+			# one behind it for reference.
+			$widget element create cmp_pressure -xdata crema_cmp_time \
+				-ydata crema_cmp_pressure -symbol none -label "" \
+				-linewidth [rescale_x_skin 4] -color [::theme dim] \
+				-smooth $::settings(live_graph_smoothing_technique) -pixels 0
+			$widget element create cmp_flow -xdata crema_cmp_time \
+				-ydata crema_cmp_flow -symbol none -label "" \
+				-linewidth [rescale_x_skin 4] -color [::theme dim] \
+				-smooth $::settings(live_graph_smoothing_technique) -pixels 0
 			$widget element create hist_weight -xdata crema_hist_time \
 				-ydata crema_hist_weight -symbol none -label "" \
 				-linewidth [rescale_x_skin 6] -color [::theme weight] \
@@ -116,6 +131,15 @@ namespace eval ::crema::pages::crema_shot {
 
 		# delete this shot from history - two-tap confirm (no modal dialog), since
 		# a stray tap shouldn't wipe a record
+		# Overlaying the previous shot with the same bean has been asked for on
+		# the Decent forum since 2023, and it needs no AI: it is the fastest way
+		# to see what a change actually did.
+		dui add dbutton $page 2160 50 2440 132 -tags shot_compare -shape round -radius 20 \
+			-fill [::theme button] -outline [::theme card_outline] -bwidth 2 \
+			-label "Compare" -label_pos {0.5 0.5} -label_font_family "Mazzard Medium" \
+			-label_font_size 15 -label_fill [::theme background_text] \
+			-command ::crema::pages::crema_shot::toggle_compare
+
 		dui add dbutton $page 1780 50 2130 132 -tags shot_delete -shape round -radius 20 \
 			-fill [::theme button] -outline [::theme card_outline] -bwidth 2 \
 			-label "Delete" -label_pos {0.5 0.5} \
@@ -225,6 +249,94 @@ namespace eval ::crema::pages::crema_shot {
 		catch { crema_hist_pressure set {0} }
 		catch { crema_hist_flow set {0} }
 		catch { crema_hist_weight set {0} }
+		clear_compare
+	}
+
+	# ---- comparison overlay -----------------------------------------------
+
+	proc clear_compare {} {
+		variable data
+		set data(comparing) 0
+		set page [namespace tail [namespace current]]
+		catch { crema_cmp_time set {0} }
+		catch { crema_cmp_pressure set {0} }
+		catch { crema_cmp_flow set {0} }
+		catch { dui item config $page shot_compare-lbl -text "Compare" }
+	}
+
+	proc set_compare_label {txt} {
+		set page [namespace tail [namespace current]]
+		catch { dui item config $page shot_compare-lbl -text $txt }
+	}
+
+	proc toggle_compare {} {
+		variable data
+		if {[ifexists data(comparing) 0]} { clear_compare; return }
+		if {![info exists data(bean)] || $data(bean) eq ""} {
+			set_compare_label "no bean"
+			return
+		}
+		set_compare_label "loading"
+		# Ask for this bean's recent shots, then pick the one immediately before
+		# the open shot. Filtering by bean matters: comparing against a
+		# different coffee tells you nothing about a change.
+		::crema::history::recent 12 ::crema::pages::crema_shot::compare_list $data(bean)
+	}
+
+	proc compare_list {rows} {
+		variable data
+		set mine [ifexists data(created_at) ""]
+		set prev ""
+		foreach r $rows {
+			set id ""; set at ""
+			catch { set id [dict get $r id] }
+			catch { set at [dict get $r created_at] }
+			if {$id eq "" || $id eq [ifexists data(id) ""]} { continue }
+			# rows arrive newest-first, so the first one older than this shot is
+			# the one immediately before it
+			if {$mine ne "" && $at ne "" && $at >= $mine} { continue }
+			set prev $id
+			break
+		}
+		if {$prev eq ""} {
+			set_compare_label "no earlier"
+			return
+		}
+		::crema::history::get $prev ::crema::pages::crema_shot::compare_loaded
+	}
+
+	proc compare_loaded {s} {
+		variable data
+		if {![llength $s]} { set_compare_label "unavailable"; return }
+		if {[catch {
+			set p [dict get $s payload]
+			set elapsed [dict get $p elapsed]
+			set pres    [dict get $p pressure]
+			set flow    [dict get $p flow]
+			set T {}; set P {}; set F {}
+			for {set i 0} {$i < [llength $elapsed]} {incr i} {
+				set t [lindex $elapsed $i]
+				if {![string is double -strict $t]} { continue }
+				lappend T $t
+				foreach {src dst} [list $pres P $flow F] {
+					set v [lindex $src $i]
+					if {![string is double -strict $v]} { set v 0 }
+					lappend $dst $v
+				}
+			}
+			if {[llength $T] < 2} { error "no usable curve" }
+			crema_cmp_time set $T
+			crema_cmp_pressure set $P
+			crema_cmp_flow set $F
+			set data(comparing) 1
+			set when ""
+			catch { set when [string range [dict get $s created_at] 5 9] }
+			set_compare_label [expr {$when eq "" ? {comparing} : "vs $when"}]
+		} err]} {
+			msg -ERROR "crema: compare failed: $err"
+			clear_compare
+			set_compare_label "unavailable"
+		}
 	}
 
 	proc nn {v} {
@@ -244,6 +356,8 @@ namespace eval ::crema::pages::crema_shot {
 			set a {}
 			catch { set a [dict get $p answers] }
 
+			catch { set data(bean) [nn [dict get $p bean name]] }
+			catch { set data(created_at) [dict get $s created_at] }
 			catch { dui item config $page shot_bean -text [nn [dict get $p bean name]] }
 			catch { dui item config $page shot_date \
 				-text [string map {T "  "} [string range [dict get $s created_at] 0 15]] }
