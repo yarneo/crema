@@ -343,8 +343,10 @@ namespace eval ::crema::advisor {
 			after 0 [list {*}$cb error "Shot not found."]
 			return
 		}
-		::crema::llm::get_advice_async $rec [previous_for $rec] \
-			[list ::crema::advisor::advise_stored_done $rec $cb]
+		# route through ensure_server_reachable so a moved Mac-server IP is
+		# rediscovered (no-op for direct-provider modes) - same as the shot path
+		ensure_server_reachable [list ::crema::llm::get_advice_async $rec [previous_for $rec] \
+			[list ::crema::advisor::advise_stored_done $rec $cb]]
 	}
 	proc advise_stored_done {rec cb outcome payload} {
 		if {$outcome ne "ok"} { after 0 [list {*}$cb error $payload]; return }
@@ -365,8 +367,11 @@ namespace eval ::crema::advisor {
 			after 0 [list {*}$cb error "Shot not found."]
 			return
 		}
-		::crema::llm::get_advice_async $rec [previous_for $rec] \
-			[list ::crema::advisor::reconsider_done $rec $reason $cb] $reason
+		# route through ensure_server_reachable so a moved Mac-server IP is
+		# rediscovered (no-op for direct-provider modes) - Reconsider used to hit
+		# the stale IP directly and error instantly when the Mac's DHCP IP changed
+		ensure_server_reachable [list ::crema::llm::get_advice_async $rec [previous_for $rec] \
+			[list ::crema::advisor::reconsider_done $rec $reason $cb] $reason]
 	}
 	proc reconsider_done {rec reason cb outcome payload} {
 		if {$outcome ne "ok"} { after 0 [list {*}$cb error $payload]; return }
