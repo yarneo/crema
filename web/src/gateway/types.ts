@@ -35,12 +35,18 @@ export interface WorkflowWire {
   description?: string;
   profile?: ProfileWire;
   context?: WorkflowContextWire;
+  steamSettings?: SteamSettingsWire;
+  hotWaterData?: HotWaterWire;
+  rinseData?: RinseWire;
 }
 
 /** A partial update. Decaid applies whatever is present and uploads it. */
 export interface WorkflowPatch {
   profile?: ProfileWire;
   context?: WorkflowContextWire;
+  steamSettings?: SteamSettingsWire;
+  hotWaterData?: HotWaterWire;
+  rinseData?: RinseWire;
 }
 
 /**
@@ -112,4 +118,27 @@ export interface BeanBatchWire {
   weightRemaining?: number | null;
   frozen?: boolean;
   archived?: boolean;
+}
+
+/** The states a skin may command. Decaid's enum has more, but these are ours. */
+export type CommandableState = 'espresso' | 'steam' | 'hotWater' | 'flush' | 'steamRinse' | 'idle' | 'sleeping';
+
+export interface SteamSettingsWire {
+  targetTemperature?: number | null;
+  duration?: number | null;
+  flow?: number | null;
+  stopAtTemperature?: number | null;
+}
+
+export interface HotWaterWire {
+  targetTemperature?: number | null;
+  duration?: number | null;
+  volume?: number | null;
+  flow?: number | null;
+}
+
+export interface RinseWire {
+  targetTemperature?: number | null;
+  duration?: number | null;
+  flow?: number | null;
 }

@@ -22,7 +22,7 @@ import { diffToWorkflowPatch, undoPatch, workflowToRecipe } from './gateway/work
 import type { BeanBatchWire, BeanWire, ProfileEntryWire, WorkflowPatch, WorkflowWire } from './gateway/types.ts';
 import { applyDiff, diffRecipe, type Recipe } from './domain/recipe.ts';
 import { buildTrail, type TrailNode, type TrailShot } from './domain/trail.ts';
-import { EMPTY_RATING, type Rating, type RatingKey } from './domain/rating.ts';
+import { describeRating, EMPTY_RATING, type Rating, type RatingKey } from './domain/rating.ts';
 import { analyseFlowPhases } from './advice/phases.ts';
 import { parseAdvice } from './advice/parse.ts';
 import { adviceToDiff } from './advice/proposal.ts';
@@ -32,6 +32,7 @@ import type { Advice } from './advice/schema.ts';
 import type { ShotCurves } from './advice/curves.ts';
 import { LiveMonitor, toCurves, type LiveShot } from './live.ts';
 import { hasCurves, needsRating, newShotRecord, Store, type ShotRecord } from './store.ts';
+import type { CommandableState } from './gateway/types.ts';
 import {
   renderAdvice,
   renderBean,
@@ -44,6 +45,8 @@ import {
   renderSetup,
   renderShot,
   renderShots,
+  renderActionBar,
+  renderWater,
   renderStatus,
   renderTrail,
   TABS,
@@ -51,6 +54,7 @@ import {
   type BatchRow,
   type ProfileRow,
   type ShotRow,
+  type ShotDetailModel,
   type Tab
 } from './ui/views.ts';
 import { isReady, loadSettings, saveSettings, type CremaSettings } from './settings.ts';
@@ -96,6 +100,7 @@ interface State {
   /** Batches of the selected bean, loaded lazily. */
   batches: BeanBatchWire[] | null;
   activeBeanId: string | null;
+  selectedShotId: string | null;
   rebuttalOpen: boolean;
   rebuttalText: string;
   reconsidering: boolean;
@@ -127,6 +132,7 @@ const state: State = {
   beans: null,
   batches: null,
   activeBeanId: null,
+  selectedShotId: null,
   rebuttalOpen: false,
   rebuttalText: '',
   reconsidering: false,
@@ -249,6 +255,63 @@ function beanRows(): BeanRow[] {
   }));
 }
 
+function waterModel() {
+  const steam = state.workflow?.steamSettings ?? {};
+  const hot = state.workflow?.hotWaterData ?? {};
+  const rinse = state.workflow?.rinseData ?? {};
+
+  return {
+    steam: {
+      targetTemperature: steam.targetTemperature ?? null,
+      duration: steam.duration ?? null,
+      flow: steam.flow ?? null
+    },
+    hotWater: {
+      targetTemperature: hot.targetTemperature ?? null,
+      duration: hot.duration ?? null,
+      volume: hot.volume ?? null,
+      flow: hot.flow ?? null
+    },
+    rinse: {
+      targetTemperature: rinse.targetTemperature ?? null,
+      duration: rinse.duration ?? null,
+      flow: rinse.flow ?? null
+    },
+    busy: state.busy
+  };
+}
+
+/** The selected stored shot, replayed from its own record. */
+function shotDetail(): ShotDetailModel | null {
+  const record = state.records.find((r) => r.id === state.selectedShotId);
+  if (!record) return null;
+
+  const dose = record.recipe.doseG;
+  const out = record.finalYieldG;
+  const tasted = describeRating(record.rating);
+
+  return {
+    summary: dose !== null && out !== null ? `${dose.toFixed(1)}g → ${out.toFixed(1)}g` : 'Shot',
+    when: new Date(record.at).toLocaleString(),
+    profileTitle: record.recipe.profileTitle ?? '—',
+    coffeeName: record.bean.name ?? '',
+    rating: tasted || 'not rated',
+    advice: record.advice,
+    chart: hasCurves(record)
+      ? {
+          ...record.curves!,
+          evidence: [],
+          phases: analyseFlowPhases({
+            elapsedS: record.curves!.elapsedS,
+            pressureBar: record.curves!.pressureBar,
+            flowMlS: record.curves!.flowMlS,
+            weightFlow: record.curves!.weightFlow
+          })
+        }
+      : null
+  };
+}
+
 function shotRows(): ShotRow[] {
   return state.records.map((r) => {
     const out = r.finalYieldG;
@@ -304,6 +367,7 @@ function renderBrew(): string {
     : null;
 
   return `
+    ${renderActionBar({ machineState: state.machineState, busy: state.busy })}
     ${renderBean({
       name: bean.name ?? SAMPLE_BEAN.name,
       roastDate: activeBatch()?.roastDate ?? (usingSample() ? SAMPLE_BEAN.roastDate : null)
@@ -346,8 +410,10 @@ function renderBody(): string {
             activeBeanName: (state.beans ?? []).find((b) => b.id === state.activeBeanId)?.name ?? null,
             batches: state.activeBeanId === null ? null : batchRows()
           });
+    case 'water':
+      return state.workflow === null ? loading('machine settings') : renderWater(waterModel());
     case 'shots':
-      return renderShots(shotRows(), state.records.length);
+      return renderShots(shotRows(), state.records.length, state.selectedShotId, shotDetail());
     case 'setup':
       return renderSetup({
         ...state.settings,
@@ -731,6 +797,106 @@ function saveSetup(form: HTMLFormElement): void {
   render();
 }
 
+/**
+ * Command the machine.
+ *
+ * Water moves when this runs, so it is only ever reached from a deliberate
+ * button press. A failure is reported rather than swallowed — silently doing
+ * nothing when someone asks for steam is worse than saying why not.
+ */
+async function commandMachine(next: string): Promise<void> {
+  const allowed: CommandableState[] = ['espresso', 'steam', 'hotWater', 'flush', 'steamRinse', 'idle', 'sleeping'];
+  if (!allowed.includes(next as CommandableState)) return;
+
+  state.busy = true;
+  render();
+  try {
+    await gateway.setState(next as CommandableState);
+    state.error = null;
+  } catch (cause) {
+    state.error = (cause as Error).message;
+  } finally {
+    state.busy = false;
+    render();
+  }
+}
+
+/**
+ * The steam / hot-water / flush fields a stepper may touch.
+ *
+ * Declared explicitly rather than indexed by string: it keeps the compiler
+ * checking every read and write, and it means an unknown field name cannot
+ * reach the machine at all. Same reasoning as `applyDiff`.
+ */
+const WATER_FIELDS: Record<
+  string,
+  { get: (w: WorkflowWire) => number | null; patch: (w: WorkflowWire, value: number) => WorkflowPatch }
+> = {
+  'steamSettings.targetTemperature': {
+    get: (w) => w.steamSettings?.targetTemperature ?? null,
+    patch: (w, v) => ({ steamSettings: { ...w.steamSettings, targetTemperature: v } })
+  },
+  'steamSettings.duration': {
+    get: (w) => w.steamSettings?.duration ?? null,
+    patch: (w, v) => ({ steamSettings: { ...w.steamSettings, duration: v } })
+  },
+  'steamSettings.flow': {
+    get: (w) => w.steamSettings?.flow ?? null,
+    patch: (w, v) => ({ steamSettings: { ...w.steamSettings, flow: v } })
+  },
+  'hotWaterData.targetTemperature': {
+    get: (w) => w.hotWaterData?.targetTemperature ?? null,
+    patch: (w, v) => ({ hotWaterData: { ...w.hotWaterData, targetTemperature: v } })
+  },
+  'hotWaterData.duration': {
+    get: (w) => w.hotWaterData?.duration ?? null,
+    patch: (w, v) => ({ hotWaterData: { ...w.hotWaterData, duration: v } })
+  },
+  'hotWaterData.volume': {
+    get: (w) => w.hotWaterData?.volume ?? null,
+    patch: (w, v) => ({ hotWaterData: { ...w.hotWaterData, volume: v } })
+  },
+  'hotWaterData.flow': {
+    get: (w) => w.hotWaterData?.flow ?? null,
+    patch: (w, v) => ({ hotWaterData: { ...w.hotWaterData, flow: v } })
+  },
+  'rinseData.targetTemperature': {
+    get: (w) => w.rinseData?.targetTemperature ?? null,
+    patch: (w, v) => ({ rinseData: { ...w.rinseData, targetTemperature: v } })
+  },
+  'rinseData.duration': {
+    get: (w) => w.rinseData?.duration ?? null,
+    patch: (w, v) => ({ rinseData: { ...w.rinseData, duration: v } })
+  },
+  'rinseData.flow': {
+    get: (w) => w.rinseData?.flow ?? null,
+    patch: (w, v) => ({ rinseData: { ...w.rinseData, flow: v } })
+  }
+};
+
+/**
+ * Nudge a steam / hot-water / flush value and write it through. These live on
+ * the workflow, which is where the machine reads them, so there is no separate
+ * settings store to keep in step.
+ */
+async function bumpWater(group: string, field: string, delta: number): Promise<void> {
+  if (!state.workflow) return;
+
+  const entry = WATER_FIELDS[`${group}.${field}`];
+  if (!entry) return;
+
+  const before = state.workflow;
+  const current = entry.get(before);
+  if (current === null) return;
+
+  // Negative time, temperature or flow is meaningless; stop at zero rather
+  // than sending the machine something it has to reject.
+  const next = Math.max(0, Number((current + delta).toFixed(1)));
+  if (next === current) return;
+
+  await push(entry.patch(before, next), before);
+}
+
 function rate(key: string, value: string): void {
   if (key === 'score') {
     const score = Number(value);
@@ -790,6 +956,29 @@ root.addEventListener('click', (event) => {
 
   if (action === 'use-batch') {
     void useBatch(target.dataset['id'] ?? '');
+    return;
+  }
+
+  if (action === 'machine') {
+    void commandMachine(target.dataset['state'] ?? '');
+    return;
+  }
+
+  if (action === 'water-inc' || action === 'water-dec') {
+    const step = Number(target.dataset['step'] ?? 0);
+    void bumpWater(
+      target.dataset['group'] ?? '',
+      target.dataset['field'] ?? '',
+      action === 'water-inc' ? step : -step
+    );
+    return;
+  }
+
+  if (action === 'open-shot') {
+    const id = target.dataset['id'] ?? '';
+    // Tapping the open shot closes it, so the list is never stuck expanded.
+    state.selectedShotId = state.selectedShotId === id ? null : id;
+    render();
     return;
   }
 

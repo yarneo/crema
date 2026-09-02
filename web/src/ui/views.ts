@@ -348,13 +348,14 @@ export function renderShot(model: ShotChartModel | null): string {
 // Navigation
 // ---------------------------------------------------------------------------
 
-export const TABS = ['brew', 'profiles', 'beans', 'shots', 'setup'] as const;
+export const TABS = ['brew', 'profiles', 'beans', 'water', 'shots', 'setup'] as const;
 export type Tab = (typeof TABS)[number];
 
 const TAB_LABELS: Record<Tab, string> = {
   brew: 'Brew',
   profiles: 'Profiles',
   beans: 'Beans',
+  water: 'Water',
   shots: 'Shots',
   setup: 'Setup'
 };
@@ -527,7 +528,17 @@ export interface ShotRow {
   summary: string;
 }
 
-export function renderShots(rows: readonly ShotRow[], total: number): string {
+export interface ShotDetailModel {
+  summary: string;
+  when: string;
+  profileTitle: string;
+  coffeeName: string;
+  rating: string;
+  advice: { summary: string; diagnosis: string } | null;
+  chart: ShotChartModel | null;
+}
+
+export function renderShots(rows: readonly ShotRow[], total: number, selectedId: string | null, detail: ShotDetailModel | null): string {
   if (rows.length === 0) {
     return `<section class="card"><header><h2>Shots</h2></header>
       <p class="empty">No shots recorded yet. Pull one and it will appear here with its advice.</p></section>`;
@@ -536,10 +547,11 @@ export function renderShots(rows: readonly ShotRow[], total: number): string {
   const list = rows
     .map(
       (row) => `
-      <div class="listrow static">
+      <button class="listrow${row.id === selectedId ? ' active' : ''}" data-action="open-shot" data-id="${escape(row.id)}">
         <span class="rowmain">${escape(row.summary)}</span>
         <span class="rowmeta">${escape(row.profileTitle)}${row.coffeeName ? ` · ${escape(row.coffeeName)}` : ''} · ${escape(row.when)}</span>
-      </div>`
+        <span class="rowgo">${row.id === selectedId ? 'open' : 'view'}</span>
+      </button>`
     )
     .join('');
 
@@ -547,7 +559,40 @@ export function renderShots(rows: readonly ShotRow[], total: number): string {
     <section class="card">
       <header><h2>Shots</h2><span class="label">${rows.length} of ${total}</span></header>
       <div class="list">${list}</div>
-    </section>`;
+    </section>
+    ${detail ? renderShotDetail(detail) : ''}`;
+}
+
+/**
+ * One stored shot, reopened.
+ *
+ * The curves are replayed from the record rather than re-fetched, which is the
+ * whole reason they are persisted: a shot stays reviewable long after the
+ * machine has forgotten it.
+ */
+export function renderShotDetail(detail: ShotDetailModel): string {
+  return `
+    <section class="card">
+      <header>
+        <h2>${escape(detail.summary)}</h2>
+        <span class="label">${escape(detail.when)}</span>
+      </header>
+      <div class="drow">
+        <span class="label k">Setup</span>
+        <div class="held">${escape(detail.profileTitle)}${detail.coffeeName ? ` · ${escape(detail.coffeeName)}` : ''}</div>
+      </div>
+      <div class="drow">
+        <span class="label k">Tasted</span>
+        <div class="held">${escape(detail.rating)}</div>
+      </div>
+      ${detail.advice
+        ? `<div class="drow"><span class="label k">Advice</span><div>
+             <div class="held">${escape(detail.advice.summary)}</div>
+             <div class="why">${escape(detail.advice.diagnosis)}</div>
+           </div></div>`
+        : '<div class="drow"><span class="label k">Advice</span><div class="why">None was asked for.</div></div>'}
+    </section>
+    ${detail.chart ? renderShot(detail.chart) : '<section class="card"><p class="empty">This shot was recorded before curves were stored, so there is nothing to replay.</p></section>'}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -675,6 +720,120 @@ export function renderLive(model: LiveModel): string {
       <div class="bignums">
         <div><b class="num">${model.pressureBar.toFixed(1)}</b><span class="label">bar</span></div>
         <div><b class="num">${model.flowMlS.toFixed(1)}</b><span class="label">ml/s</span></div>
+      </div>
+    </section>`;
+}
+
+// ---------------------------------------------------------------------------
+// Machine action bar
+// ---------------------------------------------------------------------------
+
+export interface ActionBarModel {
+  /** Null when no machine is connected; nothing is commandable then. */
+  machineState: string | null;
+  busy: boolean;
+}
+
+/** States where the machine is doing something that should be stoppable. */
+const RUNNING_STATES = new Set(['espresso', 'steam', 'hotWater', 'flush', 'steamRinse']);
+
+const MACHINE_ACTIONS: readonly { state: string; label: string }[] = [
+  { state: 'espresso', label: 'Brew' },
+  { state: 'steam', label: 'Steam' },
+  { state: 'hotWater', label: 'Hot water' },
+  { state: 'flush', label: 'Flush' },
+  { state: 'steamRinse', label: 'Rinse' }
+];
+
+/**
+ * The machine controls.
+ *
+ * While something is running, the only thing offered is Stop — a row of start
+ * buttons during a live shot is how you end up steaming mid-extraction. Every
+ * button is disabled without a connected machine rather than failing on press.
+ */
+export function renderActionBar(model: ActionBarModel): string {
+  const connected = model.machineState !== null;
+  const running = connected && RUNNING_STATES.has(model.machineState!);
+  const asleep = model.machineState === 'sleeping';
+
+  if (running) {
+    return `
+      <div class="actionbar">
+        <button class="act stop" data-action="machine" data-state="idle" ${model.busy ? 'disabled' : ''}>Stop</button>
+        <span class="actnote">${escape(model.machineState!)} running</span>
+      </div>`;
+  }
+
+  const buttons = MACHINE_ACTIONS.map(
+    (action) =>
+      `<button class="act" data-action="machine" data-state="${action.state}" ${connected && !asleep && !model.busy ? '' : 'disabled'}>${escape(action.label)}</button>`
+  ).join('');
+
+  return `
+    <div class="actionbar">
+      ${buttons}
+      <span class="spacer"></span>
+      <button class="act" data-action="machine" data-state="${asleep ? 'idle' : 'sleeping'}" ${connected && !model.busy ? '' : 'disabled'}>
+        ${asleep ? 'Wake' : 'Sleep'}
+      </button>
+      ${connected ? '' : '<span class="actnote">no machine connected</span>'}
+    </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Steam, hot water and flush settings
+// ---------------------------------------------------------------------------
+
+export interface WaterModel {
+  steam: { targetTemperature: number | null; duration: number | null; flow: number | null };
+  hotWater: { targetTemperature: number | null; duration: number | null; volume: number | null; flow: number | null };
+  rinse: { targetTemperature: number | null; duration: number | null; flow: number | null };
+  busy: boolean;
+}
+
+function waterCell(label: string, unit: string, group: string, field: string, value: number | null, step: number): string {
+  return `
+    <div class="cell">
+      <span class="label">${escape(label)}${unit ? ` (${escape(unit)})` : ''}</span>
+      <div class="row">
+        <button class="step" data-action="water-dec" data-group="${group}" data-field="${field}" data-step="${step}" aria-label="decrease ${label}">−</button>
+        <span class="value">${value === null ? '—' : escape(value.toFixed(step < 1 ? 1 : 0))}</span>
+        <button class="step" data-action="water-inc" data-group="${group}" data-field="${field}" data-step="${step}" aria-label="increase ${label}">+</button>
+      </div>
+    </div>`;
+}
+
+/**
+ * Milk drinks and cleaning, so this stops being a skin you have to leave to
+ * make a cappuccino. Values write straight through to the workflow, which is
+ * where the machine reads them from.
+ */
+export function renderWater(model: WaterModel): string {
+  return `
+    <section class="card">
+      <header><h2>Steam</h2><span class="label">for milk drinks</span></header>
+      <div class="recipe">
+        ${waterCell('Temp', '°C', 'steamSettings', 'targetTemperature', model.steam.targetTemperature, 1)}
+        ${waterCell('Time', 's', 'steamSettings', 'duration', model.steam.duration, 1)}
+        ${waterCell('Flow', 'ml/s', 'steamSettings', 'flow', model.steam.flow, 0.1)}
+      </div>
+    </section>
+    <section class="card">
+      <header><h2>Hot water</h2><span class="label">for americanos and tea</span></header>
+      <div class="recipe">
+        ${waterCell('Temp', '°C', 'hotWaterData', 'targetTemperature', model.hotWater.targetTemperature, 1)}
+        ${waterCell('Volume', 'ml', 'hotWaterData', 'volume', model.hotWater.volume, 5)}
+        ${waterCell('Time', 's', 'hotWaterData', 'duration', model.hotWater.duration, 1)}
+        ${waterCell('Flow', 'ml/s', 'hotWaterData', 'flow', model.hotWater.flow, 0.5)}
+      </div>
+    </section>
+    <section class="card">
+      <header><h2>Flush</h2><span class="label">rinsing the group</span></header>
+      <div class="recipe">
+        ${waterCell('Temp', '°C', 'rinseData', 'targetTemperature', model.rinse.targetTemperature, 1)}
+        ${waterCell('Time', 's', 'rinseData', 'duration', model.rinse.duration, 1)}
+        ${waterCell('Flow', 'ml/s', 'rinseData', 'flow', model.rinse.flow, 0.5)}
       </div>
     </section>`;
 }

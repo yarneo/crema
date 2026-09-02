@@ -1,7 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { renderAdvice, renderBeansScreen, renderRating, type AdviceModel, type BeansModel } from '../ui/views.ts';
+import {
+  renderActionBar,
+  renderAdvice,
+  renderBeansScreen,
+  renderRating,
+  renderShots,
+  renderWater,
+  type AdviceModel,
+  type BeansModel
+} from '../ui/views.ts';
 import { diffRecipe, type Recipe } from '../domain/recipe.ts';
 import { EMPTY_RATING } from '../domain/rating.ts';
 
@@ -157,4 +166,105 @@ test('one day reads as a day, not 1 days', () => {
     batches: [{ id: 'x3', roastDate: '2026-09-01T09:00:00.000Z', roastLevel: null, daysOffRoast: 1, weightRemaining: null, active: false }]
   });
   assert.match(html, /1 day off roast/);
+});
+
+// ---- machine action bar ---------------------------------------------------
+
+test('nothing is commandable without a connected machine', () => {
+  const html = renderActionBar({ machineState: null, busy: false });
+  assert.match(html, /no machine connected/);
+  for (const label of ['Brew', 'Steam', 'Hot water', 'Flush', 'Rinse']) {
+    assert.match(html, new RegExp(`${label}</button>`), `${label} is present`);
+  }
+  assert.equal((html.match(/disabled/g) ?? []).length, 6, 'all five actions plus sleep are disabled');
+});
+
+test('a sleeping machine offers only Wake', () => {
+  const html = renderActionBar({ machineState: 'sleeping', busy: false });
+  assert.match(html, /Wake/);
+  assert.match(html, /data-state="idle"/);
+  assert.match(html, /data-state="espresso"[^>]*disabled/, 'no brewing until it is awake');
+});
+
+test('while something runs, Stop is the only thing offered', () => {
+  for (const running of ['espresso', 'steam', 'hotWater', 'flush', 'steamRinse']) {
+    const html = renderActionBar({ machineState: running, busy: false });
+    assert.match(html, /class="act stop"/, running);
+    assert.match(html, /data-state="idle"/);
+    // A row of start buttons mid-shot is how you steam during extraction.
+    assert.ok(!html.includes('data-state="steam"'), `no start buttons during ${running}`);
+    assert.ok(!html.includes('data-state="espresso"'));
+  }
+});
+
+test('an idle machine can start anything, and be put to sleep', () => {
+  const html = renderActionBar({ machineState: 'idle', busy: false });
+  assert.ok(!/data-state="espresso"[^>]*disabled/.test(html));
+  assert.match(html, /data-state="sleeping"/);
+  assert.match(html, /Sleep/);
+});
+
+test('a command in flight disables the bar rather than queueing presses', () => {
+  const html = renderActionBar({ machineState: 'idle', busy: true });
+  assert.match(html, /data-state="espresso"[^>]*disabled/);
+});
+
+// ---- water settings -------------------------------------------------------
+
+const water = {
+  steam: { targetTemperature: 150, duration: 50, flow: 0.8 },
+  hotWater: { targetTemperature: 75, duration: 30, volume: 50, flow: 10 },
+  rinse: { targetTemperature: 90, duration: 10, flow: 6 },
+  busy: false
+};
+
+test('every water value is shown with a stepper naming its own field', () => {
+  const html = renderWater(water);
+  assert.match(html, /data-group="steamSettings"[^>]*data-field="targetTemperature"/);
+  assert.match(html, /data-group="hotWaterData"[^>]*data-field="volume"/);
+  assert.match(html, /data-group="rinseData"[^>]*data-field="flow"/);
+  assert.match(html, /150/);
+  assert.match(html, /0\.8/, 'flow keeps its decimal');
+  assert.match(html, /for milk drinks/);
+});
+
+test('a value the gateway did not send reads as unset, not zero', () => {
+  const html = renderWater({ ...water, steam: { targetTemperature: null, duration: null, flow: null } });
+  assert.match(html, /—/);
+  assert.ok(!/>0<\/span>/.test(html), 'zero would look like a real setting');
+});
+
+// ---- shot detail ----------------------------------------------------------
+
+const shotRows = [
+  { id: 's1', when: '2 Sep', profileTitle: 'Adaptive v3', coffeeName: 'Gesha', summary: '18.0g → 36.0g · 2/5' }
+];
+
+test('shot rows are openable and mark the open one', () => {
+  assert.match(renderShots(shotRows, 1, null, null), /data-action="open-shot"[^>]*data-id="s1"/);
+  assert.match(renderShots(shotRows, 1, 's1', null), /class="listrow active"/);
+});
+
+test('the detail replays the rating and the advice that was given', () => {
+  const html = renderShots(shotRows, 1, 's1', {
+    summary: '18.0g → 36.0g',
+    when: '2 Sep',
+    profileTitle: 'Adaptive v3',
+    coffeeName: 'Gesha',
+    rating: 'taste=sour, score=2/5',
+    advice: { summary: 'Grind finer to 12.0', diagnosis: 'Ran fast.' },
+    chart: { elapsedS: [0, 1, 2], pressureBar: [1, 6, 9], flowMlS: [0, 1, 2], evidence: [], phases: null }
+  });
+  assert.match(html, /taste=sour, score=2\/5/);
+  assert.match(html, /Grind finer to 12\.0/);
+  assert.match(html, /Ran fast\./);
+});
+
+test('a shot with no advice says so instead of leaving a blank row', () => {
+  const html = renderShots(shotRows, 1, 's1', {
+    summary: '18.0g → 36.0g', when: '2 Sep', profileTitle: 'p', coffeeName: '',
+    rating: 'not rated', advice: null, chart: null
+  });
+  assert.match(html, /None was asked for/);
+  assert.match(html, /recorded before curves were stored/, 'and explains the missing chart honestly');
 });

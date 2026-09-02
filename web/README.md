@@ -134,8 +134,9 @@ provable without hardware.
 - [x] Shot records in Decaid's key-value store, so they follow the user
 - [x] Reconsider: push back on the advice and have it re-examine the shot
 - [x] Bean bags with roast dates, so days-off-roast is real
-- [ ] Steam, hot water and flush controls
-- [ ] Shot detail view (replay a stored shot)
+- [x] Machine controls: brew, steam, hot water, flush, rinse, sleep/wake
+- [x] Water tab: steam, hot-water and flush settings
+- [x] Shot detail: replay a stored shot with its rating and advice
 
 Design rationale for the port and the UI direction is in the design brief; the
 ranked backlog is [issues #7–#16](https://github.com/yarneo/crema/issues).

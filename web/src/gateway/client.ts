@@ -13,6 +13,7 @@
 
 import type {
   BeanBatchWire,
+  CommandableState,
   BeanWire,
   MachineStateWire,
   ProfileEntryWire,
@@ -213,6 +214,16 @@ export class Gateway {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(bean)
     });
+  }
+
+  /**
+   * Command the machine.
+   *
+   * This actuates real hardware — water moves — so it is only ever called from
+   * an explicit button press, never as part of loading a screen.
+   */
+  setState(state: CommandableState): Promise<void> {
+    return this.request<void>(`/api/v1/machine/state/${state}`, { method: 'PUT' });
   }
 
   readBatches(beanId: string): Promise<BeanBatchWire[]> {
