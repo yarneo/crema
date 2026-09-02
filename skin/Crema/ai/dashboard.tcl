@@ -27,32 +27,39 @@ namespace eval ::crema::pages::crema_dashboard {
 		dui add dtext $page 160 220 -text "" -tags dash_status -font_size 18 \
 			-fill [::theme muted] -anchor w -width 2200
 
-		# column headers
-		set cols {date "DATE" bean "BEAN" grind "GRIND" time "TIME" inout "IN › OUT" taste "TASTE" stars "SCORE"}
-		set xs   {160 540 1060 1280 1500 2060 2320}
-		set i 0
-		foreach {key label} $cols {
-			dui add dtext $page [lindex $xs $i] 700 -text $label \
-				-font_family "Mazzard Medium" -font_size 14 -fill [::theme muted] \
-				-anchor w -tags hdr_$key
-			incr i
-		}
-
+		# ---- shot cards -----------------------------------------------------
+		# Was a seven-column spreadsheet with star ratings. A card per shot with
+		# one headline, one muted meta line and a score chip is how every skin
+		# people actually praise presents this, and it survives being read at
+		# arm's length.
 		for {set r 0} {$r < $max_rows} {incr r} {
-			set y [expr {760 + $r * 130}]
-			set i 0
-			foreach key {date bean grind time inout taste stars} {
-				set fill [::theme background_text]
-				if {$key eq "stars"} { set fill [::theme accent] }
-				if {$key eq "date"}  { set fill [::theme muted] }
-				dui add dtext $page [lindex $xs $i] $y -text "" -font_size 19 \
-					-fill $fill -anchor w -tags [list row_${r}_$key row_${r}_tap]
-				incr i
-			}
-			dui add dtext $page 160 [expr {$y + 50}] -text "" -font_size 14 \
-				-fill [::theme muted] -anchor w -width 2240 -tags [list row_${r}_advice row_${r}_tap]
-			# whole row opens the shot detail page
-			dui add dbutton $page 140 [expr {$y - 30}] 2420 [expr {$y + 88}] \
+			set y [expr {690 + $r * 152}]
+
+			dui add shape round $page 120 $y -bwidth 2320 -bheight 134 \
+				-fill [::theme card_fill] -radius 24 -tags row_${r}_card
+
+			dui add dtext $page 180 [expr {$y + 34}] -text "" -font_size 23 \
+				-font_family "Mazzard SemiBold" -fill [::theme background_text] \
+				-anchor w -width 620 -tags [list row_${r}_bean row_${r}_tap]
+			dui add dtext $page 860 [expr {$y + 34}] -text "" -font_size 27 \
+				-font_family "Mazzard SemiBold" -fill [::theme background_text] \
+				-anchor w -tags [list row_${r}_inout row_${r}_tap]
+
+			dui add dtext $page 180 [expr {$y + 82}] -text "" -font_size 15 \
+				-fill [::theme muted] -anchor w -width 1900 \
+				-tags [list row_${r}_meta row_${r}_tap]
+			dui add dtext $page 180 [expr {$y + 112}] -text "" -font_size 14 \
+				-fill [::theme muted] -anchor w -width 1900 \
+				-tags [list row_${r}_advice row_${r}_tap]
+
+			# score chip; its fill is set per shot so a good one reads at a glance
+			dui add shape round $page 2170 [expr {$y + 26}] -bwidth 190 -bheight 68 \
+				-fill [::theme button] -radius 20 -tags row_${r}_chip
+			dui add dtext $page 2265 [expr {$y + 60}] -text "" -font_size 22 \
+				-font_family "Mazzard SemiBold" -fill [::theme muted] \
+				-anchor center -justify center -tags [list row_${r}_score row_${r}_tap]
+
+			dui add dbutton $page 120 $y 2440 [expr {$y + 134}] \
 				-tags [list rowhit_$r row_${r}_tap] -fill {} -label "" \
 				-command [list ::crema::pages::crema_dashboard::open_row $r]
 			catch { .can bind row_${r}_tap [::dui::platform::button_press] \
@@ -72,12 +79,12 @@ namespace eval ::crema::pages::crema_dashboard {
 			-fill [::theme muted] -anchor e
 
 		# paging - the row widgets are a fixed page of 8; these step through history
-		dui add dbutton $page 1600 1395 1980 1470 -tags dash_newer -shape outline \
+		dui add dbutton $page 1960 165 2170 255 -tags dash_newer -shape outline \
 			-initial_state hidden -outline [::theme card_outline] -arc_offset 24 \
 			-label "‹ Newer" -label_pos {0.5 0.5} -label_font_size 19 \
 			-label_fill [::theme background_text] \
 			-command ::crema::pages::crema_dashboard::page_newer
-		dui add dbutton $page 2020 1395 2400 1470 -tags dash_older -shape outline \
+		dui add dbutton $page 2210 165 2440 255 -tags dash_older -shape outline \
 			-initial_state hidden -outline [::theme card_outline] -arc_offset 24 \
 			-label "Older ›" -label_pos {0.5 0.5} -label_font_size 19 \
 			-label_fill [::theme background_text] \
@@ -267,9 +274,11 @@ namespace eval ::crema::pages::crema_dashboard {
 		set page [namespace tail [namespace current]]
 		trail_clear
 		for {set r 0} {$r < $max_rows} {incr r} {
-			foreach key {date bean grind time inout taste stars advice} {
+			foreach key {bean inout meta advice score} {
 				catch { dui item config $page row_${r}_$key -text "" }
 			}
+			catch { dui item config $page row_${r}_card -state hidden }
+			catch { dui item config $page row_${r}_chip -state hidden }
 		}
 	}
 
@@ -366,16 +375,35 @@ namespace eval ::crema::pages::crema_dashboard {
 			set taste ""; catch { set taste [nn [dict get $a taste_balance]] }
 			set enj "";   catch { set enj [nn [dict get $a enjoyment]] }
 			set summary ""
-			catch { set summary [string range [nn [dict get $adv screen_summary]] 0 140] }
+			# one line only: at this width and size, more than this wraps into the
+			# card below it
+			catch { set summary [string range [nn [dict get $adv screen_summary]] 0 104] }
 
-			dui item config $page row_${r}_date  -text $date
+			# one muted line instead of five columns
+			set meta {}
+			if {$date ne ""}  { lappend meta $date }
+			if {$dur ne ""}   { lappend meta $dur }
+			if {$grind ne ""} { lappend meta "grind $grind" }
+			if {$taste ne ""} { lappend meta $taste }
+
+			catch { dui item config $page row_${r}_card -state normal }
 			dui item config $page row_${r}_bean  -text $bean
-			dui item config $page row_${r}_grind -text $grind
-			dui item config $page row_${r}_time  -text $dur
 			dui item config $page row_${r}_inout -text $inout
-			dui item config $page row_${r}_taste -text $taste
-			dui item config $page row_${r}_stars -text [stars $enj]
+			dui item config $page row_${r}_meta  -text [join $meta "  ·  "]
 			dui item config $page row_${r}_advice -text $summary
+
+			# An unrated shot shows no chip at all rather than a grey zero: it is
+			# a prompt to rate it, not a score of nothing.
+			if {[string is integer -strict $enj]} {
+				catch { dui item config $page row_${r}_chip -state normal }
+				set chip [expr {$enj >= 4 ? [::theme accent] : [::theme button]}]
+				set ink  [expr {$enj >= 4 ? [::theme accent_text] : [::theme background_text]}]
+				catch { dui item config $page row_${r}_chip -fill $chip }
+				dui item config $page row_${r}_score -text "$enj/5" -fill $ink
+			} else {
+				catch { dui item config $page row_${r}_chip -state hidden }
+				dui item config $page row_${r}_score -text "rate" -fill [::theme muted]
+			}
 			incr r
 		}
 		if {$r == 0} {
