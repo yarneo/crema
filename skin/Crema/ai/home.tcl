@@ -38,6 +38,23 @@ namespace eval ::crema::pages::crema_home {
 		# tag every item for both registered names of this page
 		set page {crema_home crema_off}
 
+		# The four start buttons only exist if the tablet is ALLOWED to start
+		# things. With a group-head controller fitted, the DE1 firmware refuses
+		# tablet-initiated starts outright (machine.tcl returns early on
+		# ghc_required), so the buttons are dead weight taking a fifth of the
+		# screen. MimojaCafe - the skin Crema forked from - has always hidden
+		# them in that case and given the space back to the graph; Crema lost
+		# the conditional in the fork. This restores it.
+		variable has_rail
+		set rail [expr {![ghc_required]}]
+		set has_rail $rail
+		set R    [expr {$rail ? 1980 : 2440}]   ;# right edge of the content column
+		set CW   [expr {$R - 120}]              ;# content width
+		set MS   [expr {$CW / 5}]               ;# metric column step
+		# Sleep sits at the far right of the header when there is no rail, so the
+		# pills stop short of it rather than under it
+		set PR   [expr {$rail ? $R : $R - 240}]
+
 		# ---- header --------------------------------------------------
 		dui add dtext $page 120 100 -text "Crema" -font_family "Mazzard SemiBold" \
 			-font_size 24 -fill [::theme accent] -anchor w
@@ -52,23 +69,23 @@ namespace eval ::crema::pages::crema_home {
 		# scale are actually talking is the first thing you want to know and the
 		# thing a readout of numbers hides: a stale temperature looks exactly
 		# like a live one.
-		dui add shape round $page 1460 50 -bwidth 250 -bheight 100 -radius 50 \
+		dui add shape round $page [expr {$PR - 520}] 50 -bwidth 250 -bheight 100 -radius 50 \
 			-fill [::theme card_fill] -tags pill_de1_bg
-		dui add variable $page 1585 100 -tags pill_de1 -font_size 15 \
+		dui add variable $page [expr {$PR - 395}] 100 -tags pill_de1 -font_size 15 \
 			-fill [::theme muted] -anchor center -justify center \
 			-textvariable {[::crema::pages::crema_home::pill_text de1]}
-		dui add shape round $page 1730 50 -bwidth 250 -bheight 100 -radius 50 \
+		dui add shape round $page [expr {$PR - 250}] 50 -bwidth 250 -bheight 100 -radius 50 \
 			-fill [::theme card_fill] -tags pill_scale_bg
-		dui add variable $page 1855 100 -tags pill_scale -font_size 15 \
+		dui add variable $page [expr {$PR - 125}] 100 -tags pill_scale -font_size 15 \
 			-fill [::theme muted] -anchor center -justify center \
 			-textvariable {[::crema::pages::crema_home::pill_text scale]}
-		dui add dbutton $page 2080 50 2440 150 -tags home_sleep -shape outline \
+		dui add dbutton $page [expr {$rail ? 2080 : 2260}] 50 2440 150 -tags home_sleep -shape outline \
 			-outline [::theme card_outline] -arc_offset 50 -label "Sleep" \
 			-label_pos {0.5 0.5} -label_font_size 15 -label_fill [::theme muted] \
 			-command { start_sleep }
 
 		# ---- bean block ----------------------------------------------
-		dui add dtext $page 120 200 -text "BEAN" -font_family "Mazzard Medium" \
+		dui add dtext $page 120 196 -text "BEAN" -font_family "Mazzard Medium" \
 			-font_size 15 -fill [::theme muted] -anchor w -tags {home_bean_eyebrow home_bean_tap}
 		dui add dtext $page 120 235 -text "" -tags {home_bean home_bean_tap} \
 			-font_family "Mazzard SemiBold" -font_size 30 -fill [::theme background_text] \
@@ -77,57 +94,71 @@ namespace eval ::crema::pages::crema_home {
 			-fill [::theme muted] -anchor nw -width 1280
 		dui add dtext $page 120 380 -text "" -tags {home_recipe home_bean_tap} -font_size 19 \
 			-fill [::theme button_text_dark] -anchor nw -width 900
-		dui add dtext $page 864 362 -text "PROFILE" -font_family "Mazzard Medium" \
+		dui add dtext $page [expr {120 + 2 * $MS}] 362 -text "PROFILE" -font_family "Mazzard Medium" \
 			-font_size 12 -fill [::theme muted] -anchor nw \
 			-tags {home_profile_eyebrow home_bean_tap}
-		dui add dtext $page 864 392 -text "" -tags {home_profile home_bean_tap} \
+		dui add dtext $page [expr {120 + 2 * $MS}] 392 -text "" -tags {home_profile home_bean_tap} \
 			-font_size 17 -fill [::theme muted] -anchor nw -width 620
 		dui add dbutton $page 100 180 1420 430 -tags {home_bean_hit home_bean_tap} \
 			-fill {} -label "" -command { dui page load crema_beans }
 
 		# ---- compact grind card --------------------------------------
-		dui add shape round $page 1540 185 -bwidth 440 -bheight 260 \
+		dui add shape round $page [expr {$R - 440}] 185 -bwidth 440 -bheight 260 \
 			-fill [::theme card_fill] -radius 24 -tags {home_dial_bg home_dial_tap}
-		dui add shape outline $page 1540 185 -bwidth 440 -bheight 260 \
+		dui add shape outline $page [expr {$R - 440}] 185 -bwidth 440 -bheight 260 \
 			-outline [::theme card_outline] -width 2 -arc_offset 24 -tags home_dial_frame
-		dui add dtext $page 1760 230 -text "GRIND" -font_family "Mazzard Medium" \
+		dui add dtext $page [expr {$R - 220}] 230 -text "GRIND" -font_family "Mazzard Medium" \
 			-font_size 15 -fill [::theme muted] -anchor center -justify center \
 			-tags {home_dial_eyebrow home_dial_tap}
-		dui add dtext $page 1760 320 -text "" -tags {home_grind home_dial_tap} \
+		dui add dtext $page [expr {$R - 220}] 320 -text "" -tags {home_grind home_dial_tap} \
 			-font_family "Mazzard Medium" -font_size 48 -fill [::theme accent] \
 			-anchor center -justify center
-		dui add dtext $page 1760 400 -text "finer  <     >  coarser" -font_size 12 \
+		dui add dtext $page [expr {$R - 220}] 400 -text "finer  <     >  coarser" -font_size 12 \
 			-fill [::theme muted] -anchor center -justify center \
 			-tags {home_dial_hint home_dial_tap}
-		dui add dbutton $page 1540 185 1980 445 -tags {home_dial_hit home_dial_tap} \
+		dui add dbutton $page [expr {$R - 440}] 185 $R 445 -tags {home_dial_hit home_dial_tap} \
 			-fill {} -label "" -command { dui page load crema_beans }
 
 		# ---- action column -------------------------------------------
-		dui add dbutton $page 2080 185 2440 580 -tags home_espresso -shape round \
-			-radius 24 -fill [::theme accent] -label "Espresso" -label_pos {0.5 0.5} \
-			-label_font_family "Mazzard SemiBold" -label_font_size 30 \
-			-label_fill [::theme accent_text] \
-			-command { ghc_action_or_stop start_espresso }
-		dui add dbutton $page 2080 620 2440 870 -tags home_steam -shape round \
-			-radius 20 -fill [::theme button] -label "Steam" -label_pos {0.5 0.5} \
-			-label_font_size 24 -label_fill [::theme background_text] \
-			-command { ghc_action_or_stop start_steam }
-		dui add dbutton $page 2080 910 2440 1160 -tags home_water -shape round \
-			-radius 20 -fill [::theme button] -label "Water" -label_pos {0.5 0.5} \
-			-label_font_size 24 -label_fill [::theme background_text] \
-			-command { ghc_action_or_stop start_water }
-		dui add dbutton $page 2080 1200 2440 1450 -tags home_flush -shape round \
-			-radius 20 -fill [::theme button] -label "Flush" -label_pos {0.5 0.5} \
-			-label_font_size 24 -label_fill [::theme background_text] \
-			-command { ghc_action_or_stop start_flush }
+		# Only when the tablet is permitted to start operations. With a GHC
+		# fitted the firmware refuses them, so these would be four dead
+		# buttons occupying a fifth of the screen.
+		if {$rail} {
+			dui add dbutton $page 2080 185 2440 580 -tags home_espresso -shape round \
+				-radius 24 -fill [::theme accent] -label "Espresso" -label_pos {0.5 0.5} \
+				-label_font_family "Mazzard SemiBold" -label_font_size 30 \
+				-label_fill [::theme accent_text] \
+				-command { ghc_action_or_stop start_espresso }
+			dui add dbutton $page 2080 620 2440 870 -tags home_steam -shape round \
+				-radius 20 -fill [::theme button] -label "Steam" -label_pos {0.5 0.5} \
+				-label_font_size 24 -label_fill [::theme background_text] \
+				-command { ghc_action_or_stop start_steam }
+			dui add dbutton $page 2080 910 2440 1160 -tags home_water -shape round \
+				-radius 20 -fill [::theme button] -label "Water" -label_pos {0.5 0.5} \
+				-label_font_size 24 -label_fill [::theme background_text] \
+				-command { ghc_action_or_stop start_water }
+			dui add dbutton $page 2080 1200 2440 1450 -tags home_flush -shape round \
+				-radius 20 -fill [::theme button] -label "Flush" -label_pos {0.5 0.5} \
+				-label_font_size 24 -label_fill [::theme background_text] \
+				-command { ghc_action_or_stop start_flush }
+		} else {
+			# Stop still works with a GHC fitted (it routes to start_idle), and
+			# it is the one on-screen control worth keeping. It takes over the
+			# grind card's slot while something is running.
+			dui add dbutton $page [expr {$R - 440}] 185 $R 445 -tags home_stop \
+				-shape round -radius 24 -fill [::theme accent] \
+				-initial_state hidden -label "Stop" -label_pos {0.5 0.5} \
+				-label_font_family "Mazzard SemiBold" -label_font_size 30 \
+				-label_fill [::theme accent_text] \
+				-command { ghc_action_or_stop start_espresso }
+		}
 
 		# ---- live metrics row (color-keyed to the curves) ------------
-		set metrics {
-			m_time     TIME           120  {}
-			m_pressure "PRESSURE BAR" 492  primary
-			m_flow     "FLOW ML/S"    864  secondary
-			m_incup    "IN CUP"       1236 weight
-		}
+		set metrics [list \
+			m_time     TIME           120                      {} \
+			m_pressure "PRESSURE BAR" [expr {120 + $MS}]       primary \
+			m_flow     "FLOW ML/S"    [expr {120 + 2 * $MS}]   secondary \
+			m_incup    "IN CUP"       [expr {120 + 3 * $MS}]   weight]
 		foreach {proc_name label mx theme_key} $metrics {
 			set fill [::theme background_text]
 			if {$theme_key ne ""} { set fill [::theme $theme_key] }
@@ -137,20 +168,20 @@ namespace eval ::crema::pages::crema_home {
 				-font_size 38 -fill $fill -anchor nw \
 				-textvariable "\[::crema::pages::crema_home::$proc_name\]"
 		}
-		dui add dtext $page 1608 495 -text "PHASE" -font_family "Mazzard Medium" \
+		dui add dtext $page [expr {120 + 4 * $MS}] 495 -text "PHASE" -font_family "Mazzard Medium" \
 			-font_size 15 -fill [::theme muted] -anchor w
-		dui add variable $page 1608 525 -font_family "Mazzard Medium" \
+		dui add variable $page [expr {120 + 4 * $MS}] 525 -font_family "Mazzard Medium" \
 			-font_size 24 -fill [::theme background_text] \
-			-anchor nw -justify left -width 372 \
+			-anchor nw -justify left -width $MS \
 			-textvariable {[::crema::pages::crema_home::m_stage]}
 
 		# ---- graph card ----------------------------------------------
-		dui add shape round $page 120 630 -bwidth 1860 -bheight 660 \
+		dui add shape round $page 120 626 -bwidth $CW -bheight 690 \
 			-fill [::theme card_fill] -radius 24 -tags home_graph_bg
-		dui add shape outline $page 120 630 -bwidth 1860 -bheight 660 \
+		dui add shape outline $page 120 626 -bwidth $CW -bheight 690 \
 			-outline [::theme card_outline] -width 2 -arc_offset 24
 
-		add_de1_widget "crema_home crema_off" graph 160 660 {
+		add_de1_widget "crema_home crema_off" graph 160 656 {
 			# BLT markers are placed in DATA coordinates, so the phase dividers
 			# need no pixel maths - but they need the widget path.
 			set ::crema::pages::crema_home::graph $widget
@@ -191,40 +222,41 @@ namespace eval ::crema::pages::crema_home {
 				-ydata espresso_pressure -symbol none -label "" \
 				-linewidth [rescale_x_skin 8] -color [::theme primary] \
 				-smooth $::settings(live_graph_smoothing_technique) -pixels 0
-		} -plotbackground [::theme card_fill] -width [rescale_x_skin 1780] \
-			-height [rescale_y_skin 540] -borderwidth 0 -background [::theme card_fill] \
+		} -plotbackground [::theme card_fill] -width [rescale_x_skin [expr {$CW - 80}]] \
+			-height [rescale_y_skin 570] -borderwidth 0 -background [::theme card_fill] \
 			-plotrelief flat -plotpady {14 0} -plotpadx 10
 
 		# in-card legend, swatches matching the curves
+		set LS [expr {$CW / 5}]
 		foreach {sx fill label lx} [list \
-			200 [::theme primary]   "pressure · bar" 250 \
-			560 [::theme secondary] "flow · mL/s"    610 \
-			880 [::theme accent]    "in cup · g"     930 \
+			200                    [::theme primary]   "pressure · bar" 250 \
+			[expr {200 + $LS}]     [::theme secondary] "flow · mL/s"    [expr {250 + $LS}] \
+			[expr {200 + 2 * $LS}] [::theme accent]    "in cup · g"     [expr {250 + 2 * $LS}] \
 		] {
-			dui add shape round $page $sx 1238 -bwidth 32 -bheight 9 -radius 4 -fill $fill
-			dui add dtext $page $lx 1242 -text $label -font_size 14 \
+			dui add shape round $page $sx 1264 -bwidth 32 -bheight 9 -radius 4 -fill $fill
+			dui add dtext $page $lx 1268 -text $label -font_size 14 \
 				-fill [::theme muted] -anchor w
 		}
 		# right end of the legend row: says whose curve the dim trace is
-		dui add dtext $page 1940 1242 -text "" -tags home_ghost_lbl -font_size 14 \
+		dui add dtext $page [expr {$R - 40}] 1268 -text "" -tags home_ghost_lbl -font_size 14 \
 			-fill [::theme muted] -anchor e -justify right
-		dui add dtext $page 1180 1242 -text "– –" -font_size 14 \
+		dui add dtext $page [expr {200 + 3 * $LS}] 1268 -text "– –" -font_size 14 \
 			-fill [::theme primary] -anchor w
-		dui add dtext $page 1230 1242 -text "profile target" -font_size 14 \
+		dui add dtext $page [expr {250 + 3 * $LS}] 1268 -text "profile target" -font_size 14 \
 			-fill [::theme muted] -anchor w
 
 		# ---- [AI] note strip -----------------------------------------
-		dui add dbutton $page 120 1320 1980 1450 -tags home_ai_strip -shape round \
+		dui add dbutton $page 120 1348 $R 1462 -tags home_ai_strip -shape round \
 			-radius 24 -fill [::theme button] -label "" \
 			-command { dui page load crema_advice }
-		dui add shape round $page 160 1355 -bwidth 70 -bheight 56 -radius 16 \
+		dui add shape round $page 160 1376 -bwidth 70 -bheight 56 -radius 16 \
 			-fill [::theme accent] -tags {home_ai_badge home_ai_strip}
-		dui add dtext $page 195 1383 -text "AI" -font_family "Mazzard SemiBold" \
+		dui add dtext $page 195 1404 -text "AI" -font_family "Mazzard SemiBold" \
 			-font_size 15 -fill [::theme accent_text] -anchor center -justify center \
 			-tags {home_ai_badge_lbl home_ai_strip}
-		dui add dtext $page 265 1350 -text "" -tags {home_ai_note home_ai_strip} -font_size 16 \
+		dui add dtext $page 265 1372 -text "" -tags {home_ai_note home_ai_strip} -font_size 16 \
 			-fill [::theme button_text_dark] -anchor nw -width 1480
-		dui add dtext $page 1940 1385 -text "Details ›" -font_size 19 \
+		dui add dtext $page [expr {$R - 40}] 1406 -text "Details ›" -font_size 19 \
 			-fill [::theme muted] -anchor e -tags {home_ai_details home_ai_strip}
 
 		# tag-level tap bindings: DUI binds presses to item IDs at creation,
@@ -240,7 +272,7 @@ namespace eval ::crema::pages::crema_home {
 
 		# ---- nav tabs + advisor status -------------------------------
 		::crema::pages::add_nav $page brew
-		dui add dtext $page 1980 1535 -text "" -tags home_advisor_status \
+		dui add dtext $page $R 1535 -text "" -tags home_advisor_status \
 			-font_size 15 -fill [::theme muted] -anchor e
 
 		# appears while advice is brewing / when it landed / when a shot is
@@ -469,6 +501,16 @@ namespace eval ::crema::pages::crema_home {
 			-fill [expr {$flowing ? [::theme accent] : [::theme muted]}] }
 		catch { dui item config $page home_espresso-lbl \
 			-text [expr {$state eq "Espresso" ? "Stop" : "Espresso"}] }
+		variable has_rail
+		if {!$has_rail} {
+			set gs [expr {$flowing ? "hidden" : "normal"}]
+			foreach t {home_dial_bg home_dial_frame home_dial_eyebrow \
+					home_grind home_dial_hint home_dial_hit} {
+				catch { dui item config $page ${t}* -state $gs }
+			}
+			catch { dui item config $page home_stop* \
+				-state [expr {$flowing ? "normal" : "hidden"}] }
+		}
 		catch {
 			if {[dui page current] in {crema_home crema_off}} {
 				refresh_chip $page
@@ -526,6 +568,8 @@ namespace eval ::crema::pages::crema_home {
 	# the way the finished-shot page has to.
 	variable graph ""
 	variable band_sig ""
+	# whether this build drew the start-button rail (see setup)
+	variable has_rail 1
 
 	proc bands_clear {} {
 		variable graph ; variable band_sig
