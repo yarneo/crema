@@ -511,23 +511,23 @@ namespace eval ::crema::pages::crema_advice {
 				dui item config $page adv_grind_sub -text "GRIND · $cur › $target · [::crema::grinder_label]"
 			} elseif {[set ${a}(created_profile)] ne ""} {
 				dui item config $page adv_grind_hero -text "new profile"
-				dui item config $page adv_grind_sub -text "GRIND · NO CHANGE YET"
+				dui item config $page adv_grind_sub -text "GRIND · $cur unchanged · [::crema::grinder_label]"
 			} elseif {[set ${a}(profile_action)] eq "switch" && [set ${a}(profile_switch_to)] ni {"" null}} {
 				dui item config $page adv_grind_hero -text "switch profile"
-				dui item config $page adv_grind_sub -text "GRIND · NO CHANGE YET"
+				dui item config $page adv_grind_sub -text "GRIND · $cur unchanged · [::crema::grinder_label]"
 			} elseif {$has_temp} {
 				set word [expr {$temp > $::settings(espresso_temperature) ? "hotter" : "cooler"}]
 				dui item config $page adv_grind_hero -text "$word ${temp}C"
-				dui item config $page adv_grind_sub -text "GRIND · NO CHANGE YET"
+				dui item config $page adv_grind_sub -text "GRIND · $cur unchanged · [::crema::grinder_label]"
 			} elseif {$has_yield} {
 				dui item config $page adv_grind_hero -text "yield ${yield}g"
-				dui item config $page adv_grind_sub -text "GRIND · NO CHANGE YET"
+				dui item config $page adv_grind_sub -text "GRIND · $cur unchanged · [::crema::grinder_label]"
 			} elseif {$has_dose} {
 				dui item config $page adv_grind_hero -text "dose ${dose}g"
-				dui item config $page adv_grind_sub -text "GRIND · NO CHANGE YET"
+				dui item config $page adv_grind_sub -text "GRIND · $cur unchanged · [::crema::grinder_label]"
 			} else {
 				dui item config $page adv_grind_hero -text "keep $cur"
-				dui item config $page adv_grind_sub -text "GRIND · NO CHANGE YET"
+				dui item config $page adv_grind_sub -text "GRIND · $cur unchanged · [::crema::grinder_label]"
 			}
 
 			# action chips
@@ -563,11 +563,11 @@ namespace eval ::crema::pages::crema_advice {
 			if {$grind_changes || $has_temp || $has_dose || $has_yield || $has_profile} {
 				set primary_mode "apply"
 				setlabel $page adv_apply_all "Apply"
+				setvis $page adv_apply_all 1
 			} else {
 				set primary_mode "done"
-				setlabel $page adv_apply_all "Got it"
+				setvis $page adv_apply_all 0
 			}
-			setvis $page adv_apply_all 1
 		}
 	}
 
