@@ -8,6 +8,8 @@ namespace eval ::crema::pages::crema_dashboard {
 	variable row_ids {}
 	variable all_shots {}
 	variable page_off 0
+	# the slice of history currently on screen; the trail follows it
+	variable page_shots {}
 
 	proc open_row {r} {
 		variable row_ids
@@ -160,33 +162,56 @@ namespace eval ::crema::pages::crema_dashboard {
 		return ""
 	}
 
+	# A BAG, not a bean name: two lots of the same coffee roasted months apart
+	# are different coffees, and merging their shots into one trail would draw a
+	# convergence that never happened.
+	proc bag_key {rec} {
+		set n "" ; set d ""
+		catch { set n [nn [dict get $rec payload bean name]] }
+		catch { set d [nn [dict get $rec payload bean roast_date]] }
+		return [list $n $d]
+	}
+
 	proc render_trail {} {
-		variable all_shots
+		variable all_shots ; variable page_shots
 		set page [namespace tail [namespace current]]
 		trail_clear
 		catch { dui item config $page trail_title -text "" }
 		catch { dui item config $page trail_hint -text "" }
 		if {![llength $all_shots]} { return }
 
-		# One bean at a time: a trail across different coffees is meaningless.
-		# The newest shot's bean is the one being worked on.
-		set bean ""
-		catch { set bean [nn [dict get [lindex $all_shots 0] payload bean name]] }
+		# The trail follows the shots on screen: the newest row's bag. Paging
+		# back through history walks you through your bags with no extra
+		# control, which is the only thing that still works at a hundred beans.
+		set anchor [lindex $page_shots 0]
+		if {$anchor eq ""} { set anchor [lindex $all_shots 0] }
+		set key [bag_key $anchor]
+		set bean [lindex $key 0]
+		if {$bean eq ""} { return }
 
+		# is this name ambiguous - the same coffee at another roast date?
+		set dates [dict create]
+		foreach rec $all_shots {
+			set k [bag_key $rec]
+			if {[lindex $k 0] eq $bean} { dict set dates [lindex $k 1] 1 }
+		}
+
+		set total 0
 		set picked {}
 		foreach rec $all_shots {
-			set b ""
-			catch { set b [nn [dict get $rec payload bean name]] }
-			if {$b ne $bean || $b eq ""} { continue }
+			if {[bag_key $rec] ne $key} { continue }
 			set pl ""
 			catch { set pl [dict get $rec payload] }
 			if {$pl eq ""} { continue }
-			lappend picked $pl
-			if {[llength $picked] >= 8} { break }
+			incr total
+			if {[llength $picked] < 8} { lappend picked $pl }
 		}
 		set picked [lreverse $picked]
 
-		catch { dui item config $page trail_title -text "Dial-in · $bean" }
+		set label $bean
+		set rd [lindex $key 1]
+		if {[dict size $dates] > 1 && $rd ne ""} { append label "  ·  roasted $rd" }
+		catch { dui item config $page trail_title -text "Dial-in · $label" }
 		if {[llength $picked] < 2} {
 			catch { dui item config $page trail_hint -text "needs a few rated shots" }
 			return
@@ -198,7 +223,12 @@ namespace eval ::crema::pages::crema_dashboard {
 			catch { dui item config $page trail_hint -text "rate your shots to see this" }
 			return
 		}
-		catch { dui item config $page trail_hint -text "[llength $picked] shots · $rated rated" }
+		if {$total > [llength $picked]} {
+			set htxt "last [llength $picked] of $total shots · $rated rated"
+		} else {
+			set htxt "$total shots · $rated rated"
+		}
+		catch { dui item config $page trail_hint -text $htxt }
 
 		set x0 300 ; set x1 2320 ; set ytop 386 ; set ybot 520
 		# unrated shots get their own rail below the 1-5 band, so a shot you
@@ -314,7 +344,9 @@ namespace eval ::crema::pages::crema_dashboard {
 			if {$page_off >= $total && $total > 0} {
 				set page_off [expr {(($total - 1) / $max_rows) * $max_rows}]
 			}
-			render [lrange $all_shots $page_off [expr {$page_off + $max_rows - 1}]]
+			variable page_shots
+			set page_shots [lrange $all_shots $page_off [expr {$page_off + $max_rows - 1}]]
+			render $page_shots
 			catch { render_trail }
 			if {$total > 0} {
 				set from [expr {$page_off + 1}]
