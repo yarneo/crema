@@ -151,10 +151,16 @@ namespace eval ::crema::pages::crema_home {
 			-outline [::theme card_outline] -width 2 -arc_offset 24
 
 		add_de1_widget "crema_home crema_off" graph 160 660 {
+			# BLT markers are placed in DATA coordinates, so the phase dividers
+			# need no pixel maths - but they need the widget path.
+			set ::crema::pages::crema_home::graph $widget
 			$widget axis configure x -color [::theme dim] -tickfont Helv_6
 			$widget axis configure y -color [::theme dim] -tickfont Helv_6 -min 0.0 \
 				-max 12 -subdivisions 5 -majorticks {0 2 4 6 8 10 12} -hide 0
 			$widget grid configure -color [::theme grid_line] -hide no -minor no
+			$widget axis configure y2 -color [::theme accent] -tickfont Helv_6 \
+				-min 0.0 -max 120 -subdivisions 1 \
+				-majorticks {0 20 40 60 80 100 120} -hide 0
 			# The idle ghost of the last shot. Created first so the live curves
 			# always draw over it once a shot starts.
 			$widget element create crema_last_p -xdata crema_last_time \
@@ -173,9 +179,9 @@ namespace eval ::crema::pages::crema_home {
 				-ydata espresso_flow_goal -symbol none -label "" \
 				-linewidth [rescale_x_skin 4] -color [::theme secondary_light] \
 				-smooth $::settings(live_graph_smoothing_technique) -pixels 0 -dashes {5 5}
-			$widget element create line_espresso_flow_weight -xdata espresso_elapsed \
-				-ydata espresso_flow_weight -symbol none -label "" \
-				-linewidth [rescale_x_skin 6] -color [::theme weight] \
+			$widget element create line_espresso_incup -xdata espresso_elapsed \
+				-ydata espresso_weight -symbol none -label "" -mapy y2 \
+				-linewidth [rescale_x_skin 5] -color [::theme accent] \
 				-smooth $::settings(live_graph_smoothing_technique) -pixels 0
 			$widget element create line_espresso_flow -xdata espresso_elapsed \
 				-ydata espresso_flow -symbol none -label "" \
@@ -193,7 +199,7 @@ namespace eval ::crema::pages::crema_home {
 		foreach {sx fill label lx} [list \
 			200 [::theme primary]   "pressure · bar" 250 \
 			560 [::theme secondary] "flow · mL/s"    610 \
-			890 [::theme weight]    "weight · g/s"   940 \
+			880 [::theme accent]    "in cup · g"     930 \
 		] {
 			dui add shape round $page $sx 1238 -bwidth 32 -bheight 9 -radius 4 -fill $fill
 			dui add dtext $page $lx 1242 -text $label -font_size 14 \
@@ -202,9 +208,9 @@ namespace eval ::crema::pages::crema_home {
 		# right end of the legend row: says whose curve the dim trace is
 		dui add dtext $page 1940 1242 -text "" -tags home_ghost_lbl -font_size 14 \
 			-fill [::theme muted] -anchor e -justify right
-		dui add dtext $page 1220 1242 -text "– –" -font_size 14 \
+		dui add dtext $page 1180 1242 -text "– –" -font_size 14 \
 			-fill [::theme primary] -anchor w
-		dui add dtext $page 1270 1242 -text "profile target" -font_size 14 \
+		dui add dtext $page 1230 1242 -text "profile target" -font_size 14 \
 			-fill [::theme muted] -anchor w
 
 		# ---- [AI] note strip -----------------------------------------
@@ -297,6 +303,7 @@ namespace eval ::crema::pages::crema_home {
 			dui item config $page home_profile -text $pt
 		}
 
+		catch { target_guide }
 		catch { dui item config $page home_grind -text $::settings(grinder_setting) }
 		catch { dui item config $page home_dial_eyebrow \
 			-text "GRIND · [::crema::grinder_label]" }
@@ -467,6 +474,7 @@ namespace eval ::crema::pages::crema_home {
 				refresh_chip $page
 			}
 		}
+		if {$state eq "Espresso"} { catch { live_bands } } else { catch { bands_clear } }
 		if {[incr health_tick] % 30 == 1} { ping_advisor }
 		set updater [after 1000 ::crema::pages::crema_home::refresh_status]
 	}
@@ -511,6 +519,101 @@ namespace eval ::crema::pages::crema_home {
 	# and reads as broken. When nothing is brewing, the last shot's curves sit
 	# there dimmed instead, so the chart always says something.
 	variable ghost_loaded 0
+
+	# ---- live phase dividers ------------------------------------------
+	# de1app flips the sign of espresso_state_change at every frame change, so
+	# a sign flip is an exact phase boundary - no guessing from the goal curves
+	# the way the finished-shot page has to.
+	variable graph ""
+	variable band_sig ""
+
+	proc bands_clear {} {
+		variable graph ; variable band_sig
+		set band_sig ""
+		if {$graph eq ""} { return }
+		catch { foreach m [$graph marker names "crema_live*"] { $graph marker delete $m } }
+	}
+
+	proc step_names {} {
+		set names {}
+		catch {
+			foreach step [ifexists ::settings(advanced_shot) {}] {
+				set nm ""
+				catch { set nm [dict get $step name] }
+				lappend names $nm
+			}
+		}
+		return $names
+	}
+
+	proc live_bands {} {
+		variable graph ; variable band_sig
+		if {$graph eq ""} { return }
+		set sc {} ; set el {}
+		catch { set sc [espresso_state_change range 0 end] }
+		catch { set el [espresso_elapsed range 0 end] }
+		set n [llength $sc]
+		set m [llength $el]
+		if {$n < 2 || $m < 1} { return }
+
+		# espresso_state_change is seeded with a 0 before the first sample, so it
+		# is always exactly ONE longer than espresso_elapsed: sc[i] belongs to
+		# el[i-1]. Verified across six stored shots - requiring equal lengths
+		# made this draw nothing at all.
+		set bounds {}
+		set prev [lindex $sc 0]
+		for {set i 1} {$i < $n} {incr i} {
+			set j [expr {$i - 1}]
+			if {$j >= $m} { break }
+			set v [lindex $sc $i]
+			if {($v < 0) != ($prev < 0)} {
+				set bt [lindex $el $j]
+				if {[string is double -strict $bt] && $bt > 0.3} { lappend bounds $bt }
+			}
+			set prev $v
+		}
+		# redraw only when something actually changed
+		set sig [llength $bounds]
+		if {$sig eq $band_sig} { return }
+		set band_sig $sig
+		catch { foreach m [$graph marker names "crema_live*"] { $graph marker delete $m } }
+
+		set names [step_names]
+		set k 1
+		foreach t $bounds {
+			catch {
+				$graph marker create line -coords [list $t 0 $t 12] \
+					-outline [::theme dim] -dashes {2 6} -linewidth 1 \
+					-name "crema_live_l$k" -under 1
+			}
+			set lbl [lindex $names $k]
+			if {$lbl ne ""} {
+				catch {
+					$graph marker create text -coords [list $t 11.4] \
+						-text " $lbl" -anchor w -foreground [::theme muted] \
+						-font Helv_6 -name "crema_live_t$k" -under 1
+				}
+			}
+			incr k
+		}
+	}
+
+	# the yield you are aiming for, on the same 0.1x scale as the in-cup curve
+	proc target_guide {} {
+		variable graph
+		if {$graph eq ""} { return }
+		catch { $graph marker delete crema_target_l }
+		catch { $graph marker delete crema_target_t }
+		set tgt ""
+		catch { set tgt $::settings(final_desired_shot_weight) }
+		if {![string is double -strict $tgt] || $tgt <= 0} { return }
+		if {$tgt > 120} { return }
+		catch {
+			$graph marker create line -coords [list -1000 $tgt 1000 $tgt] \
+				-outline [::theme accent] -dashes {4 8} -linewidth 1 -mapy y2 \
+				-name crema_target_l -under 1
+		}
+	}
 
 	proc ghost_label {txt} {
 		catch { dui item config crema_home home_ghost_lbl -text $txt }
