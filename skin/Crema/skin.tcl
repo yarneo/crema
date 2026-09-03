@@ -32,10 +32,10 @@ if {!$_cfg_loaded} {
 	msg -NOTICE "crema-theme: no crema_settings.tdb yet, using the dark default"
 }
 msg -INFO "crema-theme: variant='[ifexists ::crema_settings(theme_variant)]'"
-if {[ifexists ::crema_settings(theme_variant)] eq "dark"} {
-	set ::iconik_settings(theme) "::crema_theme"
-} else {
+if {[ifexists ::crema_settings(theme_variant)] eq "light"} {
 	set ::iconik_settings(theme) "::crema_light_theme"
+} else {
+	set ::iconik_settings(theme) "::crema_theme"
 }
 iconik_save_settings
 

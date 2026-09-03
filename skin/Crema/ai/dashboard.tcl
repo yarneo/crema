@@ -10,6 +10,8 @@ namespace eval ::crema::pages::crema_dashboard {
 	variable page_off 0
 	# the slice of history currently on screen; the trail follows it
 	variable page_shots {}
+	# which bag on that page the trail is showing ({} = the newest row's)
+	variable trail_key {}
 
 	proc open_row {r} {
 		variable row_ids
@@ -40,6 +42,11 @@ namespace eval ::crema::pages::crema_dashboard {
 			dui add shape round $page 120 $y -bwidth 2320 -bheight 150 \
 				-fill [::theme card_fill] -radius 24 -tags row_${r}_card
 
+			# If you alternate coffees day to day, a page holds several bags while
+			# the chart above shows one. This marks the rows that chart covers.
+			dui add shape round $page 132 [expr {$y + 18}] -bwidth 9 -bheight 114 \
+				-radius 4 -fill [::theme accent] -tags row_${r}_bag \
+				-initial_state hidden
 			dui add dtext $page 180 [expr {$y + 34}] -text "" -font_size 23 \
 				-font_family "Mazzard SemiBold" -fill [::theme background_text] \
 				-anchor w -width 620 -tags [list row_${r}_bean row_${r}_tap]
@@ -79,6 +86,8 @@ namespace eval ::crema::pages::crema_dashboard {
 			-fill [::theme background_text] -anchor w
 		dui add dtext $page 2400 320 -text "" -tags trail_hint -font_size 16 \
 			-fill [::theme muted] -anchor e
+		dui add dbutton $page 120 282 1400 358 -tags trail_switch -fill {} -label "" \
+			-command ::crema::pages::crema_dashboard::cycle_trail_bag
 
 		# paging - the row widgets are a fixed page of 8; these step through history
 		dui add dbutton $page 1960 165 2170 255 -tags dash_newer -shape outline \
@@ -172,6 +181,45 @@ namespace eval ::crema::pages::crema_dashboard {
 		return [list $n $d]
 	}
 
+	# The distinct bags on the CURRENT PAGE - at most max_rows of them. Cycling
+	# the whole bean library does not survive a hundred beans; cycling what is
+	# on screen is bounded by the page and covers the real case, which is
+	# alternating two or three coffees day to day.
+	proc page_bags {} {
+		variable page_shots
+		set seen [dict create] ; set out {}
+		foreach rec $page_shots {
+			set k [bag_key $rec]
+			if {[lindex $k 0] eq "" || [dict exists $seen $k]} { continue }
+			dict set seen $k 1
+			lappend out $k
+		}
+		return $out
+	}
+
+	proc cycle_trail_bag {} {
+		variable trail_key
+		set bags [page_bags]
+		if {[llength $bags] < 2} { return }
+		set i [lsearch -exact $bags $trail_key]
+		set trail_key [lindex $bags [expr {($i + 1) % [llength $bags]}]]
+		render_trail
+	}
+
+	# show the edge marker on every visible row belonging to $key
+	proc mark_rows {key} {
+		variable page_shots ; variable max_rows
+		set page [namespace tail [namespace current]]
+		for {set r 0} {$r < $max_rows} {incr r} {
+			set on 0
+			if {$r < [llength $page_shots]} {
+				set on [expr {[bag_key [lindex $page_shots $r]] eq $key}]
+			}
+			catch { dui item config $page row_${r}_bag \
+				-state [expr {$on ? "normal" : "hidden"}] }
+		}
+	}
+
 	proc render_trail {} {
 		variable all_shots ; variable page_shots
 		set page [namespace tail [namespace current]]
@@ -183,9 +231,15 @@ namespace eval ::crema::pages::crema_dashboard {
 		# The trail follows the shots on screen: the newest row's bag. Paging
 		# back through history walks you through your bags with no extra
 		# control, which is the only thing that still works at a hundred beans.
-		set anchor [lindex $page_shots 0]
-		if {$anchor eq ""} { set anchor [lindex $all_shots 0] }
-		set key [bag_key $anchor]
+		variable trail_key
+		set bags [page_bags]
+		if {![llength $bags]} {
+			set anchor [lindex $all_shots 0]
+			if {$anchor eq ""} { return }
+			set bags [list [bag_key $anchor]]
+		}
+		if {[lsearch -exact $bags $trail_key] < 0} { set trail_key [lindex $bags 0] }
+		set key $trail_key
 		set bean [lindex $key 0]
 		if {$bean eq ""} { return }
 
@@ -208,9 +262,11 @@ namespace eval ::crema::pages::crema_dashboard {
 		}
 		set picked [lreverse $picked]
 
+		mark_rows $key
 		set label $bean
 		set rd [lindex $key 1]
 		if {[dict size $dates] > 1 && $rd ne ""} { append label "  ·  roasted $rd" }
+		if {[llength $bags] > 1} { append label "   ›" }
 		catch { dui item config $page trail_title -text "Dial-in · $label" }
 		if {[llength $picked] < 2} {
 			catch { dui item config $page trail_hint -text "needs a few rated shots" }
@@ -326,6 +382,7 @@ namespace eval ::crema::pages::crema_dashboard {
 				catch { dui item config $page row_${r}_$key -text "" }
 			}
 			catch { dui item config $page row_${r}_card -state hidden }
+			catch { dui item config $page row_${r}_bag -state hidden }
 			catch { dui item config $page row_${r}_chip -state hidden }
 		}
 	}
@@ -346,6 +403,7 @@ namespace eval ::crema::pages::crema_dashboard {
 			}
 			variable page_shots
 			set page_shots [lrange $all_shots $page_off [expr {$page_off + $max_rows - 1}]]
+			variable trail_key ; set trail_key {}
 			render $page_shots
 			catch { render_trail }
 			if {$total > 0} {
