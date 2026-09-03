@@ -13,6 +13,7 @@ catch { blt::vector create crema_cmp_flow }
 # Temperature, plotted at a tenth of its value so it shares the 0-12 axis with
 # pressure and flow — the convention every DE1 chart uses.
 catch { blt::vector create crema_hist_temp }
+catch { blt::vector create crema_hist_incup }
 catch { blt::vector create crema_cmp_temp }
 
 namespace eval ::crema::pages::crema_shot {
@@ -84,6 +85,14 @@ namespace eval ::crema::pages::crema_shot {
 			$widget axis configure y -color [::theme dim] -tickfont Helv_6 -min 0.0 \
 				-max 12 -subdivisions 5 -majorticks {0 2 4 6 8 10 12} -hide 0
 			$widget grid configure -color [::theme grid_line] -hide no -minor no
+			# Right-hand axis for the two series that are NOT bar or mL/s.
+			# Basket temperature used to be divided by 10 to squeeze onto the
+			# 0-12 axis, so a 96C shot read as "9.6" - the curve in the right
+			# place and the number wrong. Grams and degrees both read true on
+			# a plain 0-120 scale.
+			$widget axis configure y2 -color [::theme muted] -tickfont Helv_6 \
+				-min 0.0 -max 120 -subdivisions 1 \
+				-majorticks {0 20 40 60 80 100 120} -hide 0
 			# Comparison overlay, created FIRST so it draws beneath the real
 			# curves: the shot you opened must stay the subject, with the older
 			# one behind it for reference.
@@ -98,6 +107,10 @@ namespace eval ::crema::pages::crema_shot {
 			$widget element create cmp_temp -xdata crema_cmp_time \
 				-ydata crema_cmp_temp -symbol none -label "" \
 				-linewidth [rescale_x_skin 4] -color [::theme ghost] \
+				-smooth $::settings(live_graph_smoothing_technique) -pixels 0
+			$widget element create hist_incup -xdata crema_hist_time \
+				-ydata crema_hist_incup -symbol none -label "" -mapy y2 \
+				-linewidth [rescale_x_skin 5] -color [::theme accent] \
 				-smooth $::settings(live_graph_smoothing_technique) -pixels 0
 			$widget element create hist_weight -xdata crema_hist_time \
 				-ydata crema_hist_weight -symbol none -label "" \
@@ -116,12 +129,27 @@ namespace eval ::crema::pages::crema_shot {
 			# is exactly what shows how the puck behaved, which is what the
 			# forum request was actually about.
 			$widget element create hist_temp -xdata crema_hist_time \
-				-ydata crema_hist_temp -symbol none -label "" \
-				-linewidth [rescale_x_skin 5] -color [::theme accent] \
+				-ydata crema_hist_temp -symbol none -label "" -mapy y2 \
+				-linewidth [rescale_x_skin 5] -color [::theme muted] \
 				-smooth $::settings(live_graph_smoothing_technique) -pixels 0
 		} -plotbackground [::theme card_fill] -width [rescale_x_skin 2240] \
-			-height [rescale_y_skin 540] -borderwidth 0 -background [::theme card_fill] \
+			-height [rescale_y_skin 490] -borderwidth 0 -background [::theme card_fill] \
 			-plotrelief flat -plotpady {14 0} -plotpadx 10
+
+		# in-card legend. This page drew four coloured curves with no key of any
+		# kind; the brew chart has had one all along.
+		foreach {sx fill label lx tag} [list \
+			200  [::theme primary]   "pressure · bar" 250  leg_p \
+			560  [::theme secondary] "flow · mL/s"    610  leg_f \
+			880  [::theme weight]    "weight · g/s"   930  leg_w \
+			1200 [::theme accent]    "in cup · g"     1250 leg_c \
+			1500 [::theme muted]     "basket · °C"    1550 leg_t \
+		] {
+			dui add shape round $page $sx 1026 -bwidth 32 -bheight 9 -radius 4 \
+				-fill $fill -tags ${tag}_sw
+			dui add dtext $page $lx 1030 -text $label -font_size 14 \
+				-fill [::theme muted] -anchor w -tags ${tag}_lbl
+		}
 
 		# advice note card
 		dui add shape round $page 120 1110 -bwidth 2320 -bheight 340 \
@@ -263,6 +291,15 @@ namespace eval ::crema::pages::crema_shot {
 	}
 
 	# paint the score row from a value ("" = not yet rated)
+	# the in-cup entry only belongs in the legend when the shot carries the data
+	proc set_legend {have_incup} {
+		set page [namespace tail [namespace current]]
+		set st [expr {$have_incup ? "normal" : "hidden"}]
+		foreach t {leg_c_sw leg_c_lbl} {
+			catch { dui item config $page $t -state $st }
+		}
+	}
+
 	proc render_rating {score} {
 		set page [namespace tail [namespace current]]
 		catch { dui item config $page shot_rate_hint \
@@ -327,6 +364,7 @@ namespace eval ::crema::pages::crema_shot {
 		catch { crema_hist_flow set {0} }
 		catch { crema_hist_weight set {0} }
 		catch { crema_hist_temp set {0} }
+		catch { crema_hist_incup set {0} }
 		bands_clear
 		clear_compare
 	}
@@ -523,7 +561,7 @@ namespace eval ::crema::pages::crema_shot {
 					lappend $dst $v
 				}
 				set c [lindex $bt $i]
-				lappend C [expr {[string is double -strict $c] ? $c / 10.0 : 0}]
+				lappend C [expr {[string is double -strict $c] ? $c : 0}]
 			}
 			if {[llength $T] < 2} { error "no usable curve" }
 			crema_cmp_time set $T
@@ -646,11 +684,12 @@ namespace eval ::crema::pages::crema_shot {
 
 			# replay the stored curves
 			set T {}; set P {}; set F {}; set W {}
-			set elapsed {}; set pres {}; set flow {}; set wf {}
+			set elapsed {}; set pres {}; set flow {}; set wf {}; set incup {}
 			catch { set elapsed [dict get $p elapsed] }
 			catch { set pres [dict get $p pressure] }
 			catch { set flow [dict get $p flow] }
 			catch { set wf [dict get $p weight_flow] }
+			catch { set incup [dict get $p in_cup] }
 			set bt {}
 			catch { set bt [dict get $p basket_temp] }
 			set C {}
@@ -658,13 +697,13 @@ namespace eval ::crema::pages::crema_shot {
 				set t [lindex $elapsed $i]
 				if {![string is double -strict $t]} { continue }
 				lappend T $t
-				foreach {src dst} [list $pres P $flow F $wf W] {
+				foreach {src dst} [list $pres P $flow F $wf W $incup G] {
 					set v [lindex $src $i]
 					if {![string is double -strict $v]} { set v 0 }
 					lappend $dst $v
 				}
 				set c [lindex $bt $i]
-				lappend C [expr {[string is double -strict $c] ? $c / 10.0 : 0}]
+				lappend C [expr {[string is double -strict $c] ? $c : 0}]
 			}
 			if {[llength $T] > 1} {
 				crema_hist_time set $T
@@ -672,6 +711,17 @@ namespace eval ::crema::pages::crema_shot {
 				crema_hist_flow set $F
 				crema_hist_weight set $W
 				catch { crema_hist_temp set $C }
+				# The sample loop pads missing values with 0, so a record from
+				# before in_cup capture yields a full-length list of ZEROS - a
+				# flat 0 g line claiming a series the shot never had. Ask the
+				# source list whether the data exists at all.
+				set have_incup [expr {[llength $incup] > 1}]
+				if {$have_incup} {
+					catch { crema_hist_incup set $G }
+				} else {
+					catch { crema_hist_incup set {0} }
+				}
+				catch { set_legend $have_incup }
 				set names {}
 				catch { set names [dict get $p profile_steps] }
 				set pg {} ; set fg {}

@@ -63,7 +63,8 @@ namespace eval ::crema::store {
 		foreach {key vec} {elapsed espresso_elapsed pressure espresso_pressure \
 				flow espresso_flow weight_flow espresso_flow_weight \
 				pressure_goal espresso_pressure_goal flow_goal espresso_flow_goal \
-				basket_temp espresso_temperature_basket} {
+				basket_temp espresso_temperature_basket \
+				in_cup espresso_weight} {
 			set vals {}
 			catch { set vals [$vec range 0 end] }
 			dict set rec $key $vals
