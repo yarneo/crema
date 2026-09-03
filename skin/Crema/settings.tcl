@@ -24,69 +24,79 @@ array set ::default_theme {
 # de1 vernacular (pressure green / flow blue / weight amber). One accent:
 # crema tan, spent only on the primary action and the grind number.
 array set ::crema_theme {
-    background "#1F1510"
-    background_highlight "#251A13"
-    background_text "#F5EDE2"
+    # Elevation, not outlines. The old ground (#1F1510) and card (#251A13) were
+    # six RGB points apart, so borders did all the separating - which is exactly
+    # what reads as dated. Three real steps: ground -> card -> control.
+    background "#14100D"
+    background_highlight "#1E1815"
+    background_text "#F3E8DF"
 
-    primary "#38C68F"
+    primary "#3ECF97"
     primary_light "#2A7A58"
     primary_dark "#52D6A4"
 
-    secondary "#52A9E0"
+    secondary "#5AAEF0"
     secondary_light "#2F6386"
 
-    button "#2B1F17"
-    button_coffee "#2B1F17"
-    button_steam "#2B1F17"
+    button "#282019"
+    button_coffee "#282019"
+    button_steam "#282019"
 
     button_secondary "#F2A65A"
-    button_tertiary "#2B1F17"
+    button_tertiary "#282019"
 
-    button_text_light "#F5EDE2"
-    button_text_dark "#CDB8A2"
+    button_text_light "#F3E8DF"
+    button_text_dark "#C6B3A0"
 
     accent "#F2A65A"
     accent_text "#2B1A0C"
-    muted "#A68D77"
+    muted "#A28E7C"
     dim "#6E5B4A"
+    ghost "#4A3C30"
     weight "#E2A13F"
-    card_outline "#3C2D22"
-    card_fill "#251A13"
-    grid_line "#2C2118"
+    success "#57A85A"
+    card_outline "#2E251E"
+    card_fill "#1E1815"
+    grid_line "#241D17"
 }
 
 # Crema light: warm paper, same accent family, curve colors deepened for
 # contrast on light ground
 array set ::crema_light_theme {
-    background "#F6F0E7"
-    background_highlight "#FDF9F2"
-    background_text "#2B1A0C"
+    # The default. Same elevation logic as the dark theme, inverted: a warm
+    # off-white ground with cards lifting to near-white, and a hairline only
+    # where a white-on-cream edge would otherwise be invisible.
+    background "#F4EFE7"
+    background_highlight "#FFFCF7"
+    background_text "#241A13"
 
-    primary "#1E9E6C"
-    primary_light "#A8D8C2"
-    primary_dark "#157A52"
+    primary "#12805A"
+    primary_light "#8FC9B0"
+    primary_dark "#0E6B4B"
 
-    secondary "#2B87C8"
-    secondary_light "#A9CDE8"
+    secondary "#1E6FA8"
+    secondary_light "#9BC2DE"
 
-    button "#EFE6D6"
-    button_coffee "#EFE6D6"
-    button_steam "#EFE6D6"
+    button "#EBE4D9"
+    button_coffee "#EBE4D9"
+    button_steam "#EBE4D9"
 
-    button_secondary "#E08A2E"
-    button_tertiary "#EFE6D6"
+    button_secondary "#C4702A"
+    button_tertiary "#EBE4D9"
 
-    button_text_light "#2B1A0C"
-    button_text_dark "#6E5B4A"
+    button_text_light "#241A13"
+    button_text_dark "#5E4E41"
 
-    accent "#E08A2E"
-    accent_text "#2B1A0C"
-    muted "#8A7360"
-    dim "#B3A18B"
-    weight "#B26E14"
-    card_outline "#E2D5C0"
-    card_fill "#FDF9F2"
-    grid_line "#ECE1CF"
+    accent "#C4702A"
+    accent_text "#FFFCF7"
+    muted "#7A6857"
+    dim "#B5A692"
+    ghost "#DCD2C2"
+    weight "#A96A12"
+    success "#1E7A47"
+    card_outline "#E6DDCE"
+    card_fill "#FFFCF7"
+    grid_line "#EDE5D8"
 }
 
 # By Brian K

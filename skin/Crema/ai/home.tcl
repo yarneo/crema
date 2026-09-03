@@ -52,18 +52,18 @@ namespace eval ::crema::pages::crema_home {
 		# scale are actually talking is the first thing you want to know and the
 		# thing a readout of numbers hides: a stale temperature looks exactly
 		# like a live one.
-		dui add shape round $page 1460 50 -bwidth 250 -bheight 100 -radius 34 \
+		dui add shape round $page 1460 50 -bwidth 250 -bheight 100 -radius 50 \
 			-fill [::theme card_fill] -tags pill_de1_bg
 		dui add variable $page 1585 100 -tags pill_de1 -font_size 15 \
 			-fill [::theme muted] -anchor center -justify center \
 			-textvariable {[::crema::pages::crema_home::pill_text de1]}
-		dui add shape round $page 1730 50 -bwidth 250 -bheight 100 -radius 34 \
+		dui add shape round $page 1730 50 -bwidth 250 -bheight 100 -radius 50 \
 			-fill [::theme card_fill] -tags pill_scale_bg
 		dui add variable $page 1855 100 -tags pill_scale -font_size 15 \
 			-fill [::theme muted] -anchor center -justify center \
 			-textvariable {[::crema::pages::crema_home::pill_text scale]}
 		dui add dbutton $page 2080 50 2440 150 -tags home_sleep -shape outline \
-			-outline [::theme card_outline] -arc_offset 30 -label "Sleep" \
+			-outline [::theme card_outline] -arc_offset 50 -label "Sleep" \
 			-label_pos {0.5 0.5} -label_font_size 15 -label_fill [::theme muted] \
 			-command { start_sleep }
 
@@ -87,9 +87,9 @@ namespace eval ::crema::pages::crema_home {
 
 		# ---- compact grind card --------------------------------------
 		dui add shape round $page 1540 185 -bwidth 440 -bheight 260 \
-			-fill [::theme card_fill] -radius 28 -tags {home_dial_bg home_dial_tap}
+			-fill [::theme card_fill] -radius 24 -tags {home_dial_bg home_dial_tap}
 		dui add shape outline $page 1540 185 -bwidth 440 -bheight 260 \
-			-outline [::theme card_outline] -width 2 -arc_offset 28 -tags home_dial_frame
+			-outline [::theme card_outline] -width 2 -arc_offset 24 -tags home_dial_frame
 		dui add dtext $page 1760 230 -text "GRIND" -font_family "Mazzard Medium" \
 			-font_size 15 -fill [::theme muted] -anchor center -justify center \
 			-tags {home_dial_eyebrow home_dial_tap}
@@ -104,20 +104,20 @@ namespace eval ::crema::pages::crema_home {
 
 		# ---- action column -------------------------------------------
 		dui add dbutton $page 2080 185 2440 580 -tags home_espresso -shape round \
-			-radius 36 -fill [::theme accent] -label "Espresso" -label_pos {0.5 0.5} \
+			-radius 24 -fill [::theme accent] -label "Espresso" -label_pos {0.5 0.5} \
 			-label_font_family "Mazzard SemiBold" -label_font_size 30 \
 			-label_fill [::theme accent_text] \
 			-command { ghc_action_or_stop start_espresso }
 		dui add dbutton $page 2080 620 2440 870 -tags home_steam -shape round \
-			-radius 32 -fill [::theme button] -label "Steam" -label_pos {0.5 0.5} \
+			-radius 20 -fill [::theme button] -label "Steam" -label_pos {0.5 0.5} \
 			-label_font_size 24 -label_fill [::theme background_text] \
 			-command { ghc_action_or_stop start_steam }
 		dui add dbutton $page 2080 910 2440 1160 -tags home_water -shape round \
-			-radius 32 -fill [::theme button] -label "Water" -label_pos {0.5 0.5} \
+			-radius 20 -fill [::theme button] -label "Water" -label_pos {0.5 0.5} \
 			-label_font_size 24 -label_fill [::theme background_text] \
 			-command { ghc_action_or_stop start_water }
 		dui add dbutton $page 2080 1200 2440 1450 -tags home_flush -shape round \
-			-radius 32 -fill [::theme button] -label "Flush" -label_pos {0.5 0.5} \
+			-radius 20 -fill [::theme button] -label "Flush" -label_pos {0.5 0.5} \
 			-label_font_size 24 -label_fill [::theme background_text] \
 			-command { ghc_action_or_stop start_flush }
 
@@ -140,15 +140,15 @@ namespace eval ::crema::pages::crema_home {
 		dui add dtext $page 1608 495 -text "PHASE" -font_family "Mazzard Medium" \
 			-font_size 15 -fill [::theme muted] -anchor w
 		dui add variable $page 1608 525 -font_family "Mazzard Medium" \
-			-font_size 24 -fill [::theme accent] \
+			-font_size 24 -fill [::theme background_text] \
 			-anchor nw -justify left -width 372 \
 			-textvariable {[::crema::pages::crema_home::m_stage]}
 
 		# ---- graph card ----------------------------------------------
 		dui add shape round $page 120 630 -bwidth 1860 -bheight 660 \
-			-fill [::theme card_fill] -radius 28 -tags home_graph_bg
+			-fill [::theme card_fill] -radius 24 -tags home_graph_bg
 		dui add shape outline $page 120 630 -bwidth 1860 -bheight 660 \
-			-outline [::theme card_outline] -width 2 -arc_offset 28
+			-outline [::theme card_outline] -width 2 -arc_offset 24
 
 		add_de1_widget "crema_home crema_off" graph 160 660 {
 			$widget axis configure x -color [::theme dim] -tickfont Helv_6
@@ -159,11 +159,11 @@ namespace eval ::crema::pages::crema_home {
 			# always draw over it once a shot starts.
 			$widget element create crema_last_p -xdata crema_last_time \
 				-ydata crema_last_pressure -symbol none -label "" \
-				-linewidth [rescale_x_skin 4] -color [::theme dim] \
+				-linewidth [rescale_x_skin 4] -color [::theme ghost] \
 				-smooth $::settings(live_graph_smoothing_technique) -pixels 0
 			$widget element create crema_last_f -xdata crema_last_time \
 				-ydata crema_last_flow -symbol none -label "" \
-				-linewidth [rescale_x_skin 4] -color [::theme dim] \
+				-linewidth [rescale_x_skin 4] -color [::theme ghost] \
 				-smooth $::settings(live_graph_smoothing_technique) -pixels 0
 			$widget element create line_espresso_pressure_goal -xdata espresso_elapsed \
 				-ydata espresso_pressure_goal -symbol none -label "" \
@@ -209,9 +209,9 @@ namespace eval ::crema::pages::crema_home {
 
 		# ---- [AI] note strip -----------------------------------------
 		dui add dbutton $page 120 1320 1980 1450 -tags home_ai_strip -shape round \
-			-radius 28 -fill [::theme button] -label "" \
+			-radius 24 -fill [::theme button] -label "" \
 			-command { dui page load crema_advice }
-		dui add shape round $page 160 1355 -bwidth 70 -bheight 56 -radius 14 \
+		dui add shape round $page 160 1355 -bwidth 70 -bheight 56 -radius 16 \
 			-fill [::theme accent] -tags {home_ai_badge home_ai_strip}
 		dui add dtext $page 195 1383 -text "AI" -font_family "Mazzard SemiBold" \
 			-font_size 15 -fill [::theme accent_text] -anchor center -justify center \
@@ -219,7 +219,7 @@ namespace eval ::crema::pages::crema_home {
 		dui add dtext $page 265 1350 -text "" -tags {home_ai_note home_ai_strip} -font_size 16 \
 			-fill [::theme button_text_dark] -anchor nw -width 1480
 		dui add dtext $page 1940 1385 -text "Details ›" -font_size 19 \
-			-fill [::theme accent] -anchor e -tags {home_ai_details home_ai_strip}
+			-fill [::theme muted] -anchor e -tags {home_ai_details home_ai_strip}
 
 		# tag-level tap bindings: DUI binds presses to item IDs at creation,
 		# so items that JOIN a tap tag later need a direct canvas binding
@@ -240,7 +240,7 @@ namespace eval ::crema::pages::crema_home {
 		# appears while advice is brewing / when it landed / when a shot is
 		# waiting to be rated - one slot, its command dispatches on state
 		dui add dbutton $page 2080 1480 2480 1580 -tags home_advice_chip \
-			-shape round -radius 26 -fill [::theme accent] \
+			-shape round -radius 50 -fill [::theme accent] \
 			-label "Advice ready" -label_pos {0.5 0.5} \
 			-label_font_family "Mazzard SemiBold" -label_font_size 20 \
 			-label_fill [::theme accent_text] -initial_state hidden \

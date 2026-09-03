@@ -58,7 +58,7 @@ namespace eval ::crema::pages::crema_shot {
 		foreach {key label} $chips {
 			set w [expr {$key eq "inout" ? 704 : 380}]
 			dui add shape round $page $x 270 -bwidth $w -bheight 130 \
-				-fill [::theme button] -radius 22
+				-fill [::theme button] -radius 20
 			dui add dtext $page [expr {$x + 28}] 300 -text $label \
 				-font_family "Mazzard Medium" -font_size 12 -fill [::theme muted] -anchor w
 			set fill [::theme background_text]
@@ -71,9 +71,9 @@ namespace eval ::crema::pages::crema_shot {
 
 		# curve card
 		dui add shape round $page 120 450 -bwidth 2320 -bheight 620 \
-			-fill [::theme card_fill] -radius 28
+			-fill [::theme card_fill] -radius 24
 		dui add shape outline $page 120 450 -bwidth 2320 -bheight 620 \
-			-outline [::theme card_outline] -width 2 -arc_offset 28
+			-outline [::theme card_outline] -width 2 -arc_offset 24
 
 		add_de1_widget crema_shot graph 160 480 {
 			# Keep the widget path: BLT markers are the only sane way to annotate
@@ -89,15 +89,15 @@ namespace eval ::crema::pages::crema_shot {
 			# one behind it for reference.
 			$widget element create cmp_pressure -xdata crema_cmp_time \
 				-ydata crema_cmp_pressure -symbol none -label "" \
-				-linewidth [rescale_x_skin 4] -color [::theme dim] \
+				-linewidth [rescale_x_skin 4] -color [::theme ghost] \
 				-smooth $::settings(live_graph_smoothing_technique) -pixels 0
 			$widget element create cmp_flow -xdata crema_cmp_time \
 				-ydata crema_cmp_flow -symbol none -label "" \
-				-linewidth [rescale_x_skin 4] -color [::theme dim] \
+				-linewidth [rescale_x_skin 4] -color [::theme ghost] \
 				-smooth $::settings(live_graph_smoothing_technique) -pixels 0
 			$widget element create cmp_temp -xdata crema_cmp_time \
 				-ydata crema_cmp_temp -symbol none -label "" \
-				-linewidth [rescale_x_skin 4] -color [::theme dim] \
+				-linewidth [rescale_x_skin 4] -color [::theme ghost] \
 				-smooth $::settings(live_graph_smoothing_technique) -pixels 0
 			$widget element create hist_weight -xdata crema_hist_time \
 				-ydata crema_hist_weight -symbol none -label "" \
@@ -126,7 +126,7 @@ namespace eval ::crema::pages::crema_shot {
 		# advice note card
 		dui add shape round $page 120 1110 -bwidth 2320 -bheight 340 \
 			-fill [::theme button] -radius 24
-		dui add shape round $page 160 1145 -bwidth 70 -bheight 56 -radius 14 \
+		dui add shape round $page 160 1145 -bwidth 70 -bheight 56 -radius 16 \
 			-fill [::theme accent]
 		dui add dtext $page 195 1173 -text "AI" -font_family "Mazzard SemiBold" \
 			-font_size 15 -fill [::theme accent_text] -anchor center -justify center
@@ -134,14 +134,14 @@ namespace eval ::crema::pages::crema_shot {
 			-fill [::theme button_text_dark] -anchor nw -width 1120
 
 		# re-run advice for a shot that has none (shown only when there's no advice)
-		dui add dbutton $page 1960 1230 2400 1360 -tags shot_getadvice -shape round -radius 32 \
+		dui add dbutton $page 1960 1230 2400 1360 -tags shot_getadvice -shape round -radius 20 \
 			-initial_state hidden -fill [::theme accent] -label "Get advice" -label_pos {0.5 0.5} \
 			-label_font_family "Mazzard SemiBold" -label_font_size 22 \
 			-label_fill [::theme accent_text] \
 			-command ::crema::pages::crema_shot::request_advice
 
 		# disagree with the advice - opens the push-back page (advice exists only)
-		dui add dbutton $page 1410 1230 1720 1360 -tags shot_disagree -shape round -radius 32 \
+		dui add dbutton $page 1410 1230 1720 1360 -tags shot_disagree -shape round -radius 20 \
 			-initial_state hidden -fill [::theme button] \
 			-outline [::theme card_outline] -bwidth 2 \
 			-label "Disagree" -label_pos {0.5 0.5} \
@@ -151,7 +151,7 @@ namespace eval ::crema::pages::crema_shot {
 
 		# re-run advice for a shot that already has some (re-asks the AI with the
 		# current prompt/model - shown only when advice already exists)
-		dui add dbutton $page 1750 1230 2060 1360 -tags shot_rerun -shape round -radius 32 \
+		dui add dbutton $page 1750 1230 2060 1360 -tags shot_rerun -shape round -radius 20 \
 			-initial_state hidden -fill [::theme button] \
 			-outline [::theme card_outline] -bwidth 2 \
 			-label "Re-run" -label_pos {0.5 0.5} \
@@ -160,7 +160,7 @@ namespace eval ::crema::pages::crema_shot {
 			-command ::crema::pages::crema_shot::request_advice
 
 		# apply this shot's advice to the machine (shown when advice has changes)
-		dui add dbutton $page 2090 1230 2400 1360 -tags shot_apply -shape round -radius 32 \
+		dui add dbutton $page 2090 1230 2400 1360 -tags shot_apply -shape round -radius 20 \
 			-initial_state hidden -fill [::theme accent] -label "Apply to machine" -label_pos {0.5 0.5} \
 			-label_font_family "Mazzard SemiBold" -label_font_size 16 \
 			-label_fill [::theme accent_text] \

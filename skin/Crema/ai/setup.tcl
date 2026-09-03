@@ -70,7 +70,7 @@ namespace eval ::crema::pages::crema_setup {
 	# a rounded field background + a borderless entry inset within it
 	proc field {page tag fx fy fw fh var {show ""}} {
 		dui add shape round $page $fx $fy -bwidth $fw -bheight $fh \
-			-fill [::theme card_fill] -radius 18 -tags ${tag}_bg
+			-fill [::theme card_fill] -radius 16 -tags ${tag}_bg
 		set opts [list -canvas_width [expr {$fw - 56}] -font_size 28 \
 			-textvariable $var -borderwidth 0 -relief flat \
 			-highlightthickness 1 -highlightcolor [::theme accent] \
@@ -118,7 +118,7 @@ namespace eval ::crema::pages::crema_setup {
 			set pw [expr {$span * $u + ($span - 1) * $gap}]
 			set by [expr {628 + $row * ($bh + 24)}]
 			dui add dbutton $page $bx $by [expr {$bx + $pw}] [expr {$by + $bh}] \
-				-tags prov_$key -shape round -radius 32 -fill [::theme button] \
+				-tags prov_$key -shape round -radius 20 -fill [::theme button] \
 				-label $label -label_pos {0.5 0.5} -label_font_size 25 \
 				-label_font_family "Mazzard SemiBold" -label_fill [::theme background_text] \
 				-command [list ::crema::pages::crema_setup::pick_provider $key]
@@ -132,7 +132,7 @@ namespace eval ::crema::pages::crema_setup {
 		field $page ent_key $L 1048 [expr {$colW - 150}] 100 {::crema_settings(ai_api_key)} "*"
 		# show/hide toggle - a ~100-char key is impossible to proofread masked
 		dui add dbutton $page [expr {$L + $colW - 130}] 1048 $R 1148 -tags setup_eye \
-			-shape outline -outline [::theme card_outline] -arc_offset 18 -label "Show" \
+			-shape outline -outline [::theme card_outline] -arc_offset 16 -label "Show" \
 			-label_pos {0.5 0.5} -label_font_size 20 -label_fill [::theme muted] \
 			-command ::crema::pages::crema_setup::toggle_key
 
@@ -157,12 +157,12 @@ namespace eval ::crema::pages::crema_setup {
 			-font_size 18 -fill [::theme muted] -anchor nw -width 1010
 
 		dui add dbutton $page 1430 1430 1770 1580 -tags setup_test -shape outline \
-			-outline [::theme card_outline] -arc_offset 36 -label "Test" -label_pos {0.5 0.5} \
+			-outline [::theme card_outline] -arc_offset 24 -label "Test" -label_pos {0.5 0.5} \
 			-label_font_family "Mazzard SemiBold" -label_font_size 24 \
 			-label_fill [::theme background_text] \
 			-command ::crema::pages::crema_setup::test
 
-		dui add dbutton $page 1830 1430 $R 1580 -tags setup_done -shape round -radius 36 \
+		dui add dbutton $page 1830 1430 $R 1580 -tags setup_done -shape round -radius 24 \
 			-fill [::theme accent] -label "Save & continue" -label_pos {0.5 0.5} \
 			-label_font_family "Mazzard SemiBold" -label_font_size 26 \
 			-label_fill [::theme accent_text] \
@@ -211,7 +211,7 @@ namespace eval ::crema::pages::crema_setup {
 		set page [namespace tail [namespace current]]
 		if {$status eq "ok"} {
 			catch { dui item config $page setup_test_status \
-				-text "✓ Connected - you're good to go." -fill "#57A85A" }
+				-text "✓ Connected - you're good to go." -fill [::theme success] }
 		} else {
 			catch { dui item config $page setup_test_status \
 				-text "✗ [string range $msg 0 88]" -fill [::theme accent] }

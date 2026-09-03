@@ -71,7 +71,7 @@ namespace eval ::crema::pages::crema_dashboard {
 		# which tells you what happened. Pairing each change with the score that
 		# followed it tells you whether it is working.
 		dui add shape round $page 120 270 -bwidth 2320 -bheight 340 \
-			-fill [::theme card_fill] -radius 28 -tags trail_card
+			-fill [::theme card_fill] -radius 24 -tags trail_card
 		dui add dtext $page 160 320 -text "" -tags trail_title \
 			-font_family "Mazzard SemiBold" -font_size 22 \
 			-fill [::theme background_text] -anchor w
