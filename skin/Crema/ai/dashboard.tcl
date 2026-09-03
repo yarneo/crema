@@ -20,11 +20,11 @@ namespace eval ::crema::pages::crema_dashboard {
 		variable max_rows
 		set page [namespace tail [namespace current]]
 
-		dui add dtext $page 160 120 -text "Recent shots" \
-			-font_family "Mazzard SemiBold" -font_size 42 \
+		dui add dtext $page 120 120 -text "Recent shots" \
+			-font_family "Mazzard SemiBold" -font_size 38 \
 			-fill [::theme background_text] -anchor w
 
-		dui add dtext $page 160 220 -text "" -tags dash_status -font_size 18 \
+		dui add dtext $page 120 220 -text "" -tags dash_status -font_size 19 \
 			-fill [::theme muted] -anchor w -width 2200
 
 		# ---- shot cards -----------------------------------------------------
@@ -33,9 +33,9 @@ namespace eval ::crema::pages::crema_dashboard {
 		# people actually praise presents this, and it survives being read at
 		# arm's length.
 		for {set r 0} {$r < $max_rows} {incr r} {
-			set y [expr {690 + $r * 152}]
+			set y [expr {640 + $r * 162}]
 
-			dui add shape round $page 120 $y -bwidth 2320 -bheight 134 \
+			dui add shape round $page 120 $y -bwidth 2320 -bheight 150 \
 				-fill [::theme card_fill] -radius 24 -tags row_${r}_card
 
 			dui add dtext $page 180 [expr {$y + 34}] -text "" -font_size 23 \
@@ -45,21 +45,21 @@ namespace eval ::crema::pages::crema_dashboard {
 				-font_family "Mazzard SemiBold" -fill [::theme background_text] \
 				-anchor w -tags [list row_${r}_inout row_${r}_tap]
 
-			dui add dtext $page 180 [expr {$y + 82}] -text "" -font_size 15 \
+			dui add dtext $page 180 [expr {$y + 78}] -text "" -font_size 15 \
 				-fill [::theme muted] -anchor w -width 1900 \
 				-tags [list row_${r}_meta row_${r}_tap]
-			dui add dtext $page 180 [expr {$y + 112}] -text "" -font_size 14 \
+			dui add dtext $page 180 [expr {$y + 120}] -text "" -font_size 15 \
 				-fill [::theme muted] -anchor w -width 1900 \
 				-tags [list row_${r}_advice row_${r}_tap]
 
 			# score chip; its fill is set per shot so a good one reads at a glance
-			dui add shape round $page 2170 [expr {$y + 26}] -bwidth 190 -bheight 68 \
+			dui add shape round $page 2170 [expr {$y + 34}] -bwidth 190 -bheight 68 \
 				-fill [::theme button] -radius 20 -tags row_${r}_chip
-			dui add dtext $page 2265 [expr {$y + 60}] -text "" -font_size 22 \
+			dui add dtext $page 2265 [expr {$y + 68}] -text "" -font_size 22 \
 				-font_family "Mazzard SemiBold" -fill [::theme muted] \
 				-anchor center -justify center -tags [list row_${r}_score row_${r}_tap]
 
-			dui add dbutton $page 120 $y 2440 [expr {$y + 134}] \
+			dui add dbutton $page 120 $y 2440 [expr {$y + 150}] \
 				-tags [list rowhit_$r row_${r}_tap] -fill {} -label "" \
 				-command [list ::crema::pages::crema_dashboard::open_row $r]
 			catch { .can bind row_${r}_tap [::dui::platform::button_press] \
@@ -70,7 +70,7 @@ namespace eval ::crema::pages::crema_dashboard {
 		# The one chart only this skin can draw: every other skin lists shots,
 		# which tells you what happened. Pairing each change with the score that
 		# followed it tells you whether it is working.
-		dui add shape round $page 120 270 -bwidth 2320 -bheight 390 \
+		dui add shape round $page 120 270 -bwidth 2320 -bheight 340 \
 			-fill [::theme card_fill] -radius 28 -tags trail_card
 		dui add dtext $page 160 320 -text "" -tags trail_title \
 			-font_family "Mazzard SemiBold" -font_size 22 \
@@ -200,10 +200,10 @@ namespace eval ::crema::pages::crema_dashboard {
 		}
 		catch { dui item config $page trail_hint -text "[llength $picked] shots · $rated rated" }
 
-		set x0 300 ; set x1 2320 ; set ytop 392 ; set ybot 556
+		set x0 300 ; set x1 2320 ; set ytop 386 ; set ybot 520
 		# unrated shots get their own rail below the 1-5 band, so a shot you
 		# have not scored is visible as a gap rather than silently dropped
-		set yun [expr {$ybot + 52}]
+		set yun [expr {$ybot + 36}]
 		set n [llength $picked]
 		set step [expr {$n > 1 ? double($x1 - $x0) / ($n - 1) : 0}]
 		set sy [expr {double($ybot - $ytop) / 4.0}]
@@ -216,7 +216,7 @@ namespace eval ::crema::pages::crema_dashboard {
 			[rescale_x_skin $x1] [rescale_y_skin $y4] \
 			-fill [::theme grid_line] -width 2 -dash {3 14} \
 			-tag [list $page crema_trail]
-		.can create text [rescale_x_skin $x1] [rescale_y_skin [expr {$ytop - 34}]] \
+		.can create text [rescale_x_skin $x1] [rescale_y_skin 358] \
 			-text "– –  dialled in" -fill [::theme muted] -anchor e -font Helv_6 \
 			-tag [list $page crema_trail]
 		.can create text [rescale_x_skin [expr {$x0 - 30}]] [rescale_y_skin $ytop] \
@@ -277,7 +277,7 @@ namespace eval ::crema::pages::crema_dashboard {
 			}
 
 			set lbl [expr {$prev eq "" ? "start" : [trail_change $prev $rec]}]
-			.can create text [rescale_x_skin $cx] [rescale_y_skin 636] \
+			.can create text [rescale_x_skin $cx] [rescale_y_skin 592] \
 				-text $lbl -fill [expr {$lbl in {start repeat} ? [::theme muted] : [::theme accent]}] \
 				-anchor center -font Helv_7 -tag [list $page crema_trail]
 
@@ -395,7 +395,17 @@ namespace eval ::crema::pages::crema_dashboard {
 			set summary ""
 			# one line only: at this width and size, more than this wraps into the
 			# card below it
-			catch { set summary [string range [nn [dict get $adv screen_summary]] 0 104] }
+			catch {
+				set summary [nn [dict get $adv screen_summary]]
+				# one line only at this width; cut back to a word boundary so the
+				# card never ends mid-word ("...cap the fin")
+				if {[string length $summary] > 104} {
+					set cut [string range $summary 0 103]
+					set sp [string last " " $cut]
+					if {$sp > 60} { set cut [string range $cut 0 [expr {$sp - 1}]] }
+					set summary "[string trimright $cut {,.;:}] ..."
+				}
+			}
 
 			# one muted line instead of five columns
 			set meta {}
@@ -420,7 +430,7 @@ namespace eval ::crema::pages::crema_dashboard {
 				dui item config $page row_${r}_score -text "$enj/5" -fill $ink
 			} else {
 				catch { dui item config $page row_${r}_chip -state hidden }
-				dui item config $page row_${r}_score -text "rate" -fill [::theme muted]
+				dui item config $page row_${r}_score -text "rate ›" -fill [::theme accent]
 			}
 			incr r
 		}

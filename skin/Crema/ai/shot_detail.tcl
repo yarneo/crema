@@ -56,7 +56,7 @@ namespace eval ::crema::pages::crema_shot {
 		set chips {grind "GRIND" time "TIME" inout "IN › OUT" temp "TEMP" taste "TASTE"}
 		set x 120
 		foreach {key label} $chips {
-			set w [expr {$key eq "inout" ? 560 : 300}]
+			set w [expr {$key eq "inout" ? 704 : 380}]
 			dui add shape round $page $x 270 -bwidth $w -bheight 130 \
 				-fill [::theme button] -radius 22
 			dui add dtext $page [expr {$x + 28}] 300 -text $label \

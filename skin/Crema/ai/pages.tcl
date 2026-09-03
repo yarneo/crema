@@ -186,13 +186,13 @@ namespace eval ::crema::pages::crema_qa {
 	}
 
 	proc row {page y title group options} {
-		dui add dtext $page 160 [expr {$y + 42}] -text [string toupper $title] \
+		dui add dtext $page 120 [expr {$y + 42}] -text [string toupper $title] \
 			-font_family "Mazzard Medium" -font_size 15 -fill [::theme muted] \
 			-anchor w -tags lbl_$group
 		set n [llength $options]
 		set x 640
 		foreach {value label} $options {
-			set w [expr {$n >= 5 ? 300 : ($n == 4 ? 380 : 480)}]
+			set w [expr {$n >= 5 ? 336 : ($n == 4 ? 427 : 580)}]
 			dui add dbutton $page $x $y [expr {$x + $w}] [expr {$y + 108}] \
 				-tags opt_${group}_${value} -shape round -radius 54 \
 				-fill [::theme button] -label $label -label_pos {0.5 0.5} \
@@ -206,11 +206,11 @@ namespace eval ::crema::pages::crema_qa {
 		variable groups
 		set page [namespace tail [namespace current]]
 
-		dui add dtext $page 160 90 -text "How was that shot?" \
+		dui add dtext $page 120 90 -text "How was that shot?" \
 			-font_family "Mazzard SemiBold" -font_size 38 \
 			-fill [::theme background_text] -anchor w -tags qa_title
-		dui add dtext $page 160 165 -text "" -tags qa_summary \
-			-font_size 17 -fill [::theme muted] -anchor w
+		dui add dtext $page 120 165 -text "" -tags qa_summary \
+			-font_size 19 -fill [::theme muted] -anchor w
 
 		# confirm the grind you actually used (the AI reasons from this)
 		dui add dtext $page 1620 108 -text "GRIND USED" -font_family "Mazzard Medium" \
@@ -241,7 +241,7 @@ namespace eval ::crema::pages::crema_qa {
 		# dropped the old "Rate later": leaving this page via the nav bar already
 		# keeps the shot pending, and home surfaces it as a "Rate your shot" chip.
 		# "Skip" was renamed "Discard" because users read Skip as "keep the shot".
-		dui add dbutton $page 160 1300 680 1420 -tags qa_skip -shape outline \
+		dui add dbutton $page 120 1300 680 1420 -tags qa_skip -shape outline \
 			-outline [::theme card_outline] -arc_offset 32 -label "Discard" \
 			-label_pos {0.5 0.5} -label_font_size 20 -label_fill [::theme muted] \
 			-command ::crema::pages::crema_qa::skip
@@ -311,9 +311,9 @@ namespace eval ::crema::pages::crema_advice {
 
 		# verdict hero + kicker
 		dui add dtext $page 120 330 -text "" -tags adv_grind_hero \
-			-font_family "Mazzard Light" -font_size 92 -fill [::theme accent] \
+			-font_family "Mazzard Light" -font_size 96 -fill [::theme accent] \
 			-anchor w
-		dui add dtext $page 124 490 -text "" -tags adv_grind_sub \
+		dui add dtext $page 120 490 -text "" -tags adv_grind_sub \
 			-font_family "Mazzard Medium" -font_size 15 -fill [::theme muted] -anchor w
 
 		dui add dtext $page 120 530 -text "" -tags adv_summary \
@@ -507,7 +507,7 @@ namespace eval ::crema::pages::crema_advice {
 			# verdict hero
 			if {$grind_changes} {
 				set word [expr {$target < $cur ? "finer" : "coarser"}]
-				dui item config $page adv_grind_hero -text "$word  $target"
+				dui item config $page adv_grind_hero -text "$word $target"
 				dui item config $page adv_grind_sub -text "GRIND · $cur › $target · [::crema::grinder_label]"
 			} elseif {[set ${a}(created_profile)] ne ""} {
 				dui item config $page adv_grind_hero -text "new profile"
@@ -517,16 +517,16 @@ namespace eval ::crema::pages::crema_advice {
 				dui item config $page adv_grind_sub -text "GRIND · NO CHANGE YET"
 			} elseif {$has_temp} {
 				set word [expr {$temp > $::settings(espresso_temperature) ? "hotter" : "cooler"}]
-				dui item config $page adv_grind_hero -text "$word  ${temp}C"
+				dui item config $page adv_grind_hero -text "$word ${temp}C"
 				dui item config $page adv_grind_sub -text "GRIND · NO CHANGE YET"
 			} elseif {$has_yield} {
-				dui item config $page adv_grind_hero -text "yield  ${yield}g"
+				dui item config $page adv_grind_hero -text "yield ${yield}g"
 				dui item config $page adv_grind_sub -text "GRIND · NO CHANGE YET"
 			} elseif {$has_dose} {
-				dui item config $page adv_grind_hero -text "dose  ${dose}g"
+				dui item config $page adv_grind_hero -text "dose ${dose}g"
 				dui item config $page adv_grind_sub -text "GRIND · NO CHANGE YET"
 			} else {
-				dui item config $page adv_grind_hero -text "keep  $cur"
+				dui item config $page adv_grind_hero -text "keep $cur"
 				dui item config $page adv_grind_sub -text "GRIND · NO CHANGE YET"
 			}
 
@@ -954,11 +954,14 @@ namespace eval ::crema::pages::crema_beans {
 	# it, added first so the entry draws on top, makes it match the bean cards
 	# and the grind card either side of it.
 	proc entry_row {page x y width label var} {
+		# The label, the field's box and the column all start at $x; the text
+		# inside is padded. Previously the box hung 18px to the LEFT of its own
+		# label, so no two things in a column of fields shared an edge.
 		dui add dtext $page $x [expr {$y - 46}] -text [string toupper $label] \
 			-font_family "Mazzard Medium" -font_size 13 -fill [::theme muted] -anchor w
-		dui add shape round $page [expr {$x - 18}] [expr {$y - 12}] \
-			-bwidth [expr {$width + 36}] -bheight 70 -radius 20 -fill [::theme card_fill]
-		dui add entry $page $x $y -canvas_width $width -font_size 22 \
+		dui add shape round $page $x [expr {$y - 12}] \
+			-bwidth $width -bheight 70 -radius 20 -fill [::theme card_fill]
+		dui add entry $page [expr {$x + 22}] $y -canvas_width [expr {$width - 44}] -font_size 22 \
 			-textvariable $var -borderwidth 0 -relief flat -highlightthickness 0 \
 			-bg [::theme card_fill] -foreground [::theme background_text] \
 			-insertbackground [::theme accent]
@@ -969,7 +972,7 @@ namespace eval ::crema::pages::crema_beans {
 		set page [namespace tail [namespace current]]
 
 		dui add dtext $page 120 100 -text "Beans & grind" \
-			-font_family "Mazzard SemiBold" -font_size 34 \
+			-font_family "Mazzard SemiBold" -font_size 38 \
 			-fill [::theme background_text] -anchor w
 
 		# bean library cards
@@ -1004,7 +1007,6 @@ namespace eval ::crema::pages::crema_beans {
 		dui add dtext $page 120 1150 -text "" -tags beans_cap_msg \
 			-font_family "Mazzard Medium" -font_size 16 -fill [::theme muted] -anchor w -width 740
 
-		entry_row $page 120 1250 700 "Advisor URL" {::crema_settings(server_url)}
 
 		# selected bean fields
 		entry_row $page 990 320 760 "Roaster" {::settings(bean_brand)}
@@ -1050,13 +1052,13 @@ namespace eval ::crema::pages::crema_beans {
 
 		# explicit Save (edits also autosave on tab-away, but this is the
 		# discoverable affordance - device bug #3)
-		dui add dbutton $page 1880 900 2440 1030 -tags beans_save -shape round -radius 28 \
+		dui add dbutton $page 1880 1190 2440 1320 -tags beans_save -shape round -radius 28 \
 			-fill [::theme accent] -label "Save" -label_pos {0.5 0.5} \
 			-label_font_family "Mazzard SemiBold" -label_font_size 22 \
 			-label_fill [::theme accent_text] \
 			-command ::crema::pages::crema_beans::save_and_confirm
 
-		dui add dtext $page 2160 1070 -text "" -tags beans_saved_msg -font_size 15 \
+		dui add dtext $page 2160 1370 -text "" -tags beans_saved_msg -font_size 15 \
 			-fill [::theme primary_dark] -anchor center -justify center
 
 		::crema::pages::add_nav $page beans ::crema::pages::crema_beans::save
