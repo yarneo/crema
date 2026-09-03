@@ -40,11 +40,11 @@ namespace eval ::crema::pages::crema_home {
 
 		# ---- header --------------------------------------------------
 		dui add dtext $page 120 100 -text "Crema" -font_family "Mazzard SemiBold" \
-			-font_size 26 -fill [::theme accent] -anchor w
+			-font_size 24 -fill [::theme accent] -anchor w
 		# a 'variable' item (vs dtext) is load-bearing: pages with zero
 		# variable items get no DUI update_vars ticks, and those ticks also
 		# drive the desktop simulator's espresso data feed
-		dui add variable $page 420 100 -tags home_status -font_size 20 \
+		dui add variable $page 420 100 -tags home_status -font_size 19 \
 			-fill [::theme muted] -anchor w -justify left \
 			-textvariable {[::crema::pages::crema_home::status_text]}
 
@@ -52,76 +52,81 @@ namespace eval ::crema::pages::crema_home {
 		# scale are actually talking is the first thing you want to know and the
 		# thing a readout of numbers hides: a stale temperature looks exactly
 		# like a live one.
-		dui add shape round $page 1700 62 -bwidth 250 -bheight 76 -radius 26 \
-			-fill [::theme button] -tags pill_de1_bg
-		dui add variable $page 1825 100 -tags pill_de1 -font_size 15 \
+		dui add shape round $page 1460 50 -bwidth 250 -bheight 100 -radius 34 \
+			-fill [::theme card_fill] -tags pill_de1_bg
+		dui add variable $page 1585 100 -tags pill_de1 -font_size 15 \
 			-fill [::theme muted] -anchor center -justify center \
 			-textvariable {[::crema::pages::crema_home::pill_text de1]}
-		dui add shape round $page 1975 62 -bwidth 250 -bheight 76 -radius 26 \
-			-fill [::theme button] -tags pill_scale_bg
-		dui add variable $page 2100 100 -tags pill_scale -font_size 15 \
+		dui add shape round $page 1730 50 -bwidth 250 -bheight 100 -radius 34 \
+			-fill [::theme card_fill] -tags pill_scale_bg
+		dui add variable $page 1855 100 -tags pill_scale -font_size 15 \
 			-fill [::theme muted] -anchor center -justify center \
 			-textvariable {[::crema::pages::crema_home::pill_text scale]}
-		dui add dbutton $page 2280 50 2460 150 -tags home_sleep -shape outline \
+		dui add dbutton $page 2080 50 2440 150 -tags home_sleep -shape outline \
 			-outline [::theme card_outline] -arc_offset 30 -label "Sleep" \
-			-label_pos {0.5 0.5} -label_font_size 16 -label_fill [::theme muted] \
+			-label_pos {0.5 0.5} -label_font_size 15 -label_fill [::theme muted] \
 			-command { start_sleep }
 
 		# ---- bean block ----------------------------------------------
 		dui add dtext $page 120 200 -text "BEAN" -font_family "Mazzard Medium" \
 			-font_size 15 -fill [::theme muted] -anchor w -tags {home_bean_eyebrow home_bean_tap}
 		dui add dtext $page 120 235 -text "" -tags {home_bean home_bean_tap} \
-			-font_family "Mazzard SemiBold" -font_size 34 -fill [::theme background_text] \
+			-font_family "Mazzard SemiBold" -font_size 30 -fill [::theme background_text] \
 			-anchor nw -width 1280
-		dui add dtext $page 120 330 -text "" -tags {home_bean_sub home_bean_tap} -font_size 17 \
+		dui add dtext $page 120 330 -text "" -tags {home_bean_sub home_bean_tap} -font_size 15 \
 			-fill [::theme muted] -anchor nw -width 1280
-		dui add dtext $page 120 380 -text "" -tags {home_recipe home_bean_tap} -font_size 17 \
-			-fill [::theme button_text_dark] -anchor nw -width 1280
+		dui add dtext $page 120 380 -text "" -tags {home_recipe home_bean_tap} -font_size 19 \
+			-fill [::theme button_text_dark] -anchor nw -width 900
+		dui add dtext $page 864 362 -text "PROFILE" -font_family "Mazzard Medium" \
+			-font_size 12 -fill [::theme muted] -anchor nw \
+			-tags {home_profile_eyebrow home_bean_tap}
+		dui add dtext $page 864 392 -text "" -tags {home_profile home_bean_tap} \
+			-font_size 17 -fill [::theme muted] -anchor nw -width 620
 		dui add dbutton $page 100 180 1420 430 -tags {home_bean_hit home_bean_tap} \
 			-fill {} -label "" -command { dui page load crema_beans }
 
 		# ---- compact grind card --------------------------------------
-		dui add shape round $page 1470 185 -bwidth 440 -bheight 260 \
-			-fill [::theme button] -radius 28 -tags {home_dial_bg home_dial_tap}
-		dui add shape outline $page 1470 185 -bwidth 440 -bheight 260 \
+		dui add shape round $page 1540 185 -bwidth 440 -bheight 260 \
+			-fill [::theme card_fill] -radius 28 -tags {home_dial_bg home_dial_tap}
+		dui add shape outline $page 1540 185 -bwidth 440 -bheight 260 \
 			-outline [::theme card_outline] -width 2 -arc_offset 28 -tags home_dial_frame
-		dui add dtext $page 1690 230 -text "GRIND" -font_family "Mazzard Medium" \
+		dui add dtext $page 1760 230 -text "GRIND" -font_family "Mazzard Medium" \
 			-font_size 15 -fill [::theme muted] -anchor center -justify center \
 			-tags {home_dial_eyebrow home_dial_tap}
-		dui add dtext $page 1690 320 -text "" -tags {home_grind home_dial_tap} \
-			-font_family "Mazzard Medium" -font_size 44 -fill [::theme accent] \
+		dui add dtext $page 1760 320 -text "" -tags {home_grind home_dial_tap} \
+			-font_family "Mazzard Medium" -font_size 48 -fill [::theme accent] \
 			-anchor center -justify center
-		dui add dtext $page 1690 400 -text "finer  <     >  coarser" -font_size 12 \
+		dui add dtext $page 1760 400 -text "finer  <     >  coarser" -font_size 12 \
 			-fill [::theme muted] -anchor center -justify center \
 			-tags {home_dial_hint home_dial_tap}
-		dui add dbutton $page 1470 185 1910 445 -tags {home_dial_hit home_dial_tap} \
+		dui add dbutton $page 1540 185 1980 445 -tags {home_dial_hit home_dial_tap} \
 			-fill {} -label "" -command { dui page load crema_beans }
 
 		# ---- action column -------------------------------------------
-		dui add dbutton $page 2080 185 2480 585 -tags home_espresso -shape round \
+		dui add dbutton $page 2080 185 2440 580 -tags home_espresso -shape round \
 			-radius 36 -fill [::theme accent] -label "Espresso" -label_pos {0.5 0.5} \
-			-label_font_family "Mazzard SemiBold" -label_font_size 32 \
+			-label_font_family "Mazzard SemiBold" -label_font_size 30 \
 			-label_fill [::theme accent_text] \
 			-command { ghc_action_or_stop start_espresso }
-		dui add dbutton $page 2080 625 2480 880 -tags home_steam -shape round \
+		dui add dbutton $page 2080 620 2440 870 -tags home_steam -shape round \
 			-radius 32 -fill [::theme button] -label "Steam" -label_pos {0.5 0.5} \
-			-label_font_size 23 -label_fill [::theme background_text] \
+			-label_font_size 24 -label_fill [::theme background_text] \
 			-command { ghc_action_or_stop start_steam }
-		dui add dbutton $page 2080 920 2480 1175 -tags home_water -shape round \
+		dui add dbutton $page 2080 910 2440 1160 -tags home_water -shape round \
 			-radius 32 -fill [::theme button] -label "Water" -label_pos {0.5 0.5} \
-			-label_font_size 23 -label_fill [::theme background_text] \
+			-label_font_size 24 -label_fill [::theme background_text] \
 			-command { ghc_action_or_stop start_water }
-		dui add dbutton $page 2080 1215 2480 1440 -tags home_flush -shape round \
+		dui add dbutton $page 2080 1200 2440 1450 -tags home_flush -shape round \
 			-radius 32 -fill [::theme button] -label "Flush" -label_pos {0.5 0.5} \
-			-label_font_size 23 -label_fill [::theme background_text] \
+			-label_font_size 24 -label_fill [::theme background_text] \
 			-command { ghc_action_or_stop start_flush }
 
 		# ---- live metrics row (color-keyed to the curves) ------------
 		set metrics {
 			m_time     TIME           120  {}
-			m_pressure "PRESSURE BAR" 450  primary
-			m_flow     "FLOW ML/S"    780  secondary
-			m_incup    "IN CUP"       1110 weight
+			m_pressure "PRESSURE BAR" 492  primary
+			m_flow     "FLOW ML/S"    864  secondary
+			m_incup    "IN CUP"       1236 weight
 		}
 		foreach {proc_name label mx theme_key} $metrics {
 			set fill [::theme background_text]
@@ -132,10 +137,11 @@ namespace eval ::crema::pages::crema_home {
 				-font_size 38 -fill $fill -anchor nw \
 				-textvariable "\[::crema::pages::crema_home::$proc_name\]"
 		}
-		dui add dtext $page 1980 495 -text "PHASE" -font_family "Mazzard Medium" \
-			-font_size 15 -fill [::theme muted] -anchor ne
-		dui add variable $page 1980 535 -font_size 24 -fill [::theme accent] \
-			-anchor ne -justify right -width 560 \
+		dui add dtext $page 1608 495 -text "PHASE" -font_family "Mazzard Medium" \
+			-font_size 15 -fill [::theme muted] -anchor w
+		dui add variable $page 1608 525 -font_family "Mazzard Medium" \
+			-font_size 24 -fill [::theme accent] \
+			-anchor nw -justify left -width 372 \
 			-textvariable {[::crema::pages::crema_home::m_stage]}
 
 		# ---- graph card ----------------------------------------------
@@ -212,7 +218,7 @@ namespace eval ::crema::pages::crema_home {
 			-tags {home_ai_badge_lbl home_ai_strip}
 		dui add dtext $page 265 1350 -text "" -tags {home_ai_note home_ai_strip} -font_size 16 \
 			-fill [::theme button_text_dark] -anchor nw -width 1480
-		dui add dtext $page 1940 1385 -text "Details ›" -font_size 17 \
+		dui add dtext $page 1940 1385 -text "Details ›" -font_size 19 \
 			-fill [::theme accent] -anchor e -tags {home_ai_details home_ai_strip}
 
 		# tag-level tap bindings: DUI binds presses to item IDs at creation,
@@ -229,7 +235,7 @@ namespace eval ::crema::pages::crema_home {
 		# ---- nav tabs + advisor status -------------------------------
 		::crema::pages::add_nav $page brew
 		dui add dtext $page 1980 1535 -text "" -tags home_advisor_status \
-			-font_size 14 -fill [::theme muted] -anchor e
+			-font_size 15 -fill [::theme muted] -anchor e
 
 		# appears while advice is brewing / when it landed / when a shot is
 		# waiting to be rated - one slot, its command dispatches on state
@@ -284,15 +290,12 @@ namespace eval ::crema::pages::crema_home {
 				}
 			}
 		}
+		catch { dui item config $page home_recipe -text $recipe }
 		catch {
 			set pt [ifexists ::settings(profile)]
 			if {$pt eq "" || $pt eq "Saved"} { set pt [ifexists ::settings(profile_title)] }
-			if {$pt ne ""} {
-				if {$recipe ne ""} { append recipe "   ·   " }
-				append recipe $pt
-			}
+			dui item config $page home_profile -text $pt
 		}
-		catch { dui item config $page home_recipe -text $recipe }
 
 		catch { dui item config $page home_grind -text $::settings(grinder_setting) }
 		catch { dui item config $page home_dial_eyebrow \
@@ -336,7 +339,7 @@ namespace eval ::crema::pages::crema_home {
 	proc m_stage {} {
 		set state ""
 		catch { set state [::de1::state::current_state] }
-		if {$state ne "Espresso"} { return "" }
+		if {$state ne "Espresso"} { return "–" }
 		set d ""
 		catch { set d $::settings(current_frame_description) }
 		return $d

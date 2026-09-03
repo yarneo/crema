@@ -10,6 +10,12 @@ proc unknown {args} {
 }
 # de1app ships these; tclsh here does not
 proc package {args} { return "" }
+# Files define procs into namespaces their siblings create, so checking one
+# file alone would fail on "unknown namespace" rather than on a real defect.
+foreach ns {::crema ::crema::llm ::crema::store ::crema::history ::crema::advisor
+            ::crema::pages ::crema::selftest ::crema::devshot} {
+  namespace eval $ns {}
+}
 set rc 0
 foreach f $argv {
   if {[catch { source $f } e]} { puts "$f: FAIL: $e" ; set rc 1 } else { puts "$f: ok" }
