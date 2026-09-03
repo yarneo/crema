@@ -144,11 +144,13 @@ namespace eval ::crema::pages::crema_shot {
 			880  [::theme weight]    "weight · g/s"   930  leg_w \
 			1200 [::theme accent]    "in cup · g"     1250 leg_c \
 			1500 [::theme muted]     "basket · °C"    1550 leg_t \
+			1820 [::theme ghost]     ""               1870 leg_v \
 		] {
+			set st [expr {$tag eq "leg_v" ? "hidden" : "normal"}]
 			dui add shape round $page $sx 1026 -bwidth 32 -bheight 9 -radius 4 \
-				-fill $fill -tags ${tag}_sw
+				-fill $fill -tags ${tag}_sw -initial_state $st
 			dui add dtext $page $lx 1030 -text $label -font_size 14 \
-				-fill [::theme muted] -anchor w -tags ${tag}_lbl
+				-fill [::theme muted] -anchor w -tags ${tag}_lbl -initial_state $st
 		}
 
 		# advice note card
@@ -486,6 +488,13 @@ namespace eval ::crema::pages::crema_shot {
 	proc set_compare_label {txt} {
 		set page [namespace tail [namespace current]]
 		catch { dui item config $page shot_compare-lbl -text $txt }
+		# and key the faint overlay curves on the chart itself - three grey
+		# lines with nothing naming them is the one gap left in the legend
+		set on [expr {[string match "vs *" $txt] || $txt eq "comparing"}]
+		catch { dui item config $page leg_v_lbl -text [expr {$on ? $txt : ""}] }
+		foreach t {leg_v_sw leg_v_lbl} {
+			catch { dui item config $page $t -state [expr {$on ? "normal" : "hidden"}] }
+		}
 	}
 
 	# Each press walks one shot further back through this bean's history; the
