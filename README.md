@@ -3,36 +3,86 @@
 A skin for the [Decent DE1](https://decentespresso.com/) espresso machine that turns
 every shot into a coaching session. Pull a shot, answer four taps about how it tasted,
 and an AI barista reads your pressure/flow/weight curves and tells you exactly what to
-change next — grind, dose, yield, temperature, or a whole new profile it can apply for
-you in one tap.
+change next — grind, dose, yield, temperature, or a whole new profile it writes and
+applies for you in one tap.
 
-It runs **entirely on the tablet**. You bring an API key from any major AI provider;
-Crema talks to it directly over your wifi. No companion app, no server, no account.
-
-> 🌱 **There is a second, newer Crema.** Decent shipped
-> [Decaid](https://github.com/decentespresso/decaid), a next-generation
-> cross-platform app whose skins are web apps, and Crema has been ported to it
-> on the [`decaid` branch](../../tree/decaid). That version needs **Android 9+**,
-> macOS or desktop. This branch is the skin for the classic **de1app**, which is
-> what existing DE1 tablets run — including the Android 8.1 tablets Decent
-> shipped around 2019-2020, where Decaid cannot be installed at all. Both are
-> maintained.
+You bring an API key from any major AI provider, or point Crema at a small server on
+your own Mac so it runs on a Claude subscription instead of per-call billing. No
+account, no telemetry, nothing leaves your network except the request you asked for.
 
 > ⚠️ **Work in progress.** Crema is used daily on a real machine, but it's young and
 > bugs still surface. If you hit one, please [open an issue](../../issues) — and if
 > you'd like to help build it, see [Contributing](#contributing). PRs very welcome.
 
-## Choose your app
+## Two editions, one repo
 
-- **Decaid (Android, iPad, macOS, Windows, Linux):** in Decaid open
-  **Launcher → Skins → + → GitHub Release**, enter `yarneo/crema`, and choose
-  **`Crema-Decaid.zip`**. Do not install the `decaid` source branch itself;
-  Decaid needs the built archive with `index.html` at its root.
-- **Classic DE1 app (Android tablet):** use **`Crema.zip`** and follow the
-  tablet steps below.
+Decent ships two apps, so Crema comes in two builds. Both are maintained from this
+tree and released together.
 
-The Decaid source, development guide, and local ZIP workflow live in
-[`web/README.md`](web/README.md).
+| | **Crema for Decaid** | **Crema Classic** |
+|---|---|---|
+| Runs on | [Decaid](https://github.com/decentespresso/decaid) — iPad, Android 9+, macOS, Windows, Linux | the classic `de1app` — the Android tablet your DE1 came with |
+| Install | `Crema-Decaid.zip` | `Crema.zip` |
+| Built from | [`web/`](web/) | [`skin/Crema/`](skin/Crema/) |
+| Pick it if | you use Decaid, or an iPad | you use the tablet Decent shipped, including the Android 8.1 ones where Decaid cannot be installed at all |
+
+Both do the same job and share the same advisor prompt. If you have a choice, use the
+Decaid edition — it gets the newer work first.
+
+## Crema for Decaid
+
+<table>
+  <tr>
+    <td width="50%" valign="top"><img src="docs/screenshots/decaid-1-brew.png" alt="Brew screen with the shot graph and AI advice"><br><sub><b>Brew.</b> The last shot's pressure, flow and weight against the profile's target, with the advice underneath. Hold anywhere on the graph to read exact values.</sub></td>
+    <td width="50%" valign="top"><img src="docs/screenshots/decaid-2-shots.png" alt="Recent shots with the dial-in trail"><br><sub><b>Shots.</b> Every shot with its score and the advice you were given, over a dial-in trail that shows whether you are converging.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><img src="docs/screenshots/decaid-3-profiles.png" alt="Profiles list with plan previews"><br><sub><b>Profiles.</b> Each row draws the plan it intends to execute, grouped by what you have actually brewed with.</sub></td>
+    <td width="50%" valign="top"><img src="docs/screenshots/decaid-4-profile-editor.png" alt="The profile step editor"><br><sub><b>Profile editor.</b> Build or duplicate a profile by hand — what each step holds, at what target, for how long, and how hot.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><img src="docs/screenshots/decaid-5-setup.png" alt="Setup screen"><br><sub><b>Setup.</b> Your grinder, a theme, and an AI provider. Settings save as you type them.</sub></td>
+    <td width="50%" valign="top"></td>
+  </tr>
+</table>
+
+### Install
+
+1. In Decaid, open **Launcher → Skins → +** and choose **GitHub Release**.
+2. Enter `yarneo/crema` and pick the asset **`Crema-Decaid.zip`**.
+3. Choose **Crema** from the skin list.
+
+> Do not install the repository's source archive — Decaid needs the built
+> `Crema-Decaid.zip`, which has `index.html` and `manifest.json` at its root.
+
+To install a local build instead, run `npm run release:zip` in [`web/`](web/) and use
+**Launcher → Skins → + → ZIP file**.
+
+### Set it up
+
+Open **Settings** in Crema:
+
+1. **Grinder** — its name (e.g. `Lagom 01`) and dial range (e.g. `0-1.5`). The advisor
+   phrases every move in your grinder's own units, and looks the grinder up if it needs
+   to.
+2. **Appearance** — dark or light.
+3. **AI provider** — pick one and paste its key, or choose **Local Mac server**
+   ([below](#running-on-your-own-mac)). **Model** is a list of
+   published model ids, so there is nothing to guess.
+4. Tap **Test request** to confirm it answers.
+
+Settings save as you leave each field; there is no Save button. Your key lives in this
+device's browser storage and is sent only to the provider you chose — never to the
+machine gateway.
+
+### Pulling your first shot
+
+Add the coffee in **Beans & grind**, then its bag with a roast date and roast level.
+On **Brew** you will be offered a starting point: the advisor picks a grind, dose,
+yield, temperature and profile for that bean before you have pulled anything. Pull the
+shot, rate it in four taps, and from then on each shot gets one clear change.
+
+## Crema Classic (the tablet DE1 ships with)
 
 <table>
   <tr>
@@ -42,43 +92,7 @@ The Decaid source, development guide, and local ZIP workflow live in
   </tr>
 </table>
 
-## What it does
-
-- **Beautiful shot visualization** — a dark, calm home screen with live targets,
-  the previous-shot overlay, grind number, bean, and ratio front and center; tap
-  through for temperature, weight, phases, and full-size curves.
-- **Post-shot coaching** — a ≤10-second questionnaire (taste, body, flow look,
-  finish, 1–5 score) feeds the AI along with the actual shot curves.
-- **One clear instruction** — advice comes back as a diagnosis plus *one* concrete
-  move, phrased in your grinder's own dial numbers. Tap to apply the grind change,
-  recipe tweak, or profile switch; Crema updates the machine for you.
-- **Custom profiles on demand** — when the fix is structural (bloom longer, decline
-  pressure), the AI writes a full D-Flow profile and Crema installs it as its own
-  bean-specific profile.
-- **Shot history** — every shot, its taste notes, and the advice you got, stored
-  locally on the tablet. Reopen one to disagree, re-run the AI review, apply its
-  change, or delete it; each bean also gets its own tuning trail.
-- **Device controls that explain themselves** — machine and scale connection are
-  visible and actionable on Brew, with one-tap scale tare when connected.
-
-## A quick tour
-
-<table>
-  <tr>
-    <td width="50%" valign="top"><img src="docs/screenshots/2-live-shot.png" alt="Live shot in progress"><br><sub><b>Live shot</b> — pressure, flow, and weight drawn in real time against the profile target.</sub></td>
-    <td width="50%" valign="top"><img src="docs/screenshots/7-beans-and-grind.png" alt="Beans and grind page"><br><sub><b>Beans &amp; grind</b> — a small bean library; each bean remembers its own grind, dose, and dialed-in profile.</sub></td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top"><img src="docs/screenshots/5-shot-history.png" alt="Shot history list"><br><sub><b>Shot history</b> — every shot with its taste score and the advice you were given.</sub></td>
-    <td width="50%" valign="top"><img src="docs/screenshots/6-shot-detail.png" alt="Single shot detail"><br><sub><b>Shot detail</b> — replay any past shot's curves and re-read (or ask for) its advice.</sub></td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top"><img src="docs/screenshots/8-setup.png" alt="First-run setup wizard"><br><sub><b>Setup wizard</b> — two things on first launch: your grinder, and your AI provider + key.</sub></td>
-    <td width="50%" valign="top"></td>
-  </tr>
-</table>
-
-## Install (5 minutes)
+### Install
 
 You need: a Decent DE1 with the standard Android tablet, and an API key from one AI
 provider (see [Choosing a provider](#choosing-a-provider)).
@@ -94,6 +108,48 @@ provider (see [Choosing a provider](#choosing-a-provider)).
 3. **Select it.** In the DE1 app: **Settings → App → Skin → Crema**, then restart the app.
 4. **Run the setup wizard.** On first launch Crema asks for two things — your grinder
    and your AI provider + key. That's it. Pull a shot.
+
+## What's new in v1.1.0
+
+**Crema for Decaid — first release worth installing.** It began as a port and is now
+the edition that gets new work first.
+
+- **It fits a tablet properly.** Decaid's webview runs edge to edge and reports no
+  safe-area insets at all, so the tab bar sat under the home indicator; insets are now
+  resolved rather than trusted. The brew screen fits its viewport exactly and no longer
+  scrolls, and buttons are real tap targets.
+- **Taps land.** Every websocket tick used to rebuild the whole screen, which ate
+  presses and wiped half-typed forms. Group temperature is no longer a render trigger,
+  and form contents, caret and scroll position all survive a re-render.
+- **The grind actually moves.** A step of exactly one epsilon was compared against that
+  epsilon, so floating-point error swallowed every other tap and pinned the grind
+  between 0.75 and 0.80. An unset grind also made both steppers dead; it can now be
+  typed, or seeded from the middle of your dial range.
+- **Profiles you can read and write.** Every row draws the plan it intends to execute,
+  grouped by what you have brewed with. A step editor builds one from scratch or
+  duplicates an existing one, and the AI can still author a profile itself — now inside
+  the DE1's real limits, which the parser enforces rather than merely requesting.
+- **Hold the graph** anywhere to read the exact pressure, flow and weight at that moment.
+- **A light theme**, ported from the Classic skin's palette.
+- **Setup that explains itself.** Model is a list of published ids instead of free text,
+  settings save as you type, and a moved Mac server is found again automatically.
+- Sample data no longer appears unasked — it was drawn under your own bean name and
+  read as a shot you had pulled.
+
+**Crema Classic** — 30 commits since v1.0.0:
+
+- **The graph says more.** A grams axis, the profile target you are chasing, live phase
+  dividers, stage bands, the previous shot overlaid for comparison, temperature plotted,
+  and a dim ghost curve of the last shot while idle.
+- **Shots as cards**, with a dial-in trail that shows whether you are converging — keyed
+  on the bag rather than the bean name, so two roasts of one coffee are not one dial-in.
+- **Rate a shot after the fact** from its detail page.
+- **Undo after Apply**, and the advisor is told what you already tried and how it went.
+- **One grid and one type scale** across every page, a rebuilt surface/theme system, and
+  a settings panel that no longer runs off the edge of the screen.
+- **A shot-completion chime**, connection pills on the home header, and the start buttons
+  hidden on machines that cannot use them.
+- Settings are read from the writable home directory rather than the legacy skin dir.
 
 ## Choosing a provider
 
@@ -125,6 +181,32 @@ the grind alone* and change something else instead. Smaller models still work an
 fine for quick daily tweaks, but if the advice ever feels generic or over-eager, **switch
 to the strongest model your provider offers** before anything else. It's the single
 biggest lever on advice quality.
+
+## Running on your own Mac
+
+Instead of paying per call, Crema can route advice through the `claude` CLI on your own
+Mac, drawing on a Claude **Pro or Max** subscription.
+
+```bash
+cd server
+uv run uvicorn advisor.main:app --host 0.0.0.0 --port 8877
+curl -s localhost:8877/health          # {"ok":true,...}
+```
+
+Then in Crema: **Settings → AI provider → Local Mac server**, and set **Base URL** to
+your Mac's own address — its Bonjour name (`http://your-mac.local:8877`) or LAN IP.
+`localhost` only works when the skin is running on that same Mac. Prefer the Bonjour
+name: it keeps working when the Mac's IP changes. If the address does go stale, Crema
+sweeps the subnet it last found the server on and adopts the new one.
+
+`server/com.crema.advisor.plist` is a LaunchAgent template so the server comes back on
+boot — edit its three placeholders first. Headless `claude -p` needs auth without a
+login session: run `claude setup-token` once and put `CLAUDE_CODE_OAUTH_TOKEN=...` in
+`server/.env`. Set `CREMA_MODEL` there to choose the model. Full details in
+[DEPLOY.md](DEPLOY.md).
+
+The server runs `claude -p` with web search enabled, so the advisor can look up a
+grinder's dial range rather than guess at it.
 
 ## Privacy & cost
 
@@ -163,8 +245,26 @@ advice-copy polish, and any edge cases you hit on other grinders, providers, or 
 
 ## Building & developing
 
-The skin lives in `skin/Crema/`. `build.sh` produces the clean public bundle in `dist/`
-(stripping developer state so it boots into first-run defaults).
+Both skins build from this tree, and a `v*` tag builds and publishes both
+([`.github/workflows/release.yml`](.github/workflows/release.yml)).
+
+**Crema for Decaid** lives in [`web/`](web/) — a small TypeScript app with no framework:
+
+```bash
+cd web
+npm install
+npm test              # unit tests, Node's runner, no browser or machine needed
+npm run dev           # Vite on 127.0.0.1:5173, against a Decaid on this machine
+npm run release:zip   # produces Crema-Decaid.zip
+```
+
+`VITE_GATEWAY=http://<host>:8080 npm run dev` points a laptop at a Decaid running
+elsewhere — a tablet, say. `web/dev/ipad.html` frames the skin at a real iPad's
+geometry and injects the safe-area inset a desktop browser never reports, which is the
+only way to catch that class of bug before it ships. See [`web/README.md`](web/README.md).
+
+**Crema Classic** lives in `skin/Crema/`. `build.sh` produces the clean public bundle in
+`dist/` (stripping developer state so it boots into first-run defaults).
 
 Development runs against a desktop checkout of
 [de1app](https://github.com/decentespresso/de1app) in simulator mode:

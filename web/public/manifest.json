@@ -2,7 +2,7 @@
   "id": "crema",
   "name": "Crema",
   "description": "An AI dial-in coach for the DE1. Rate a shot, get one change, apply it.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "yarneo",
   "repository": "https://github.com/yarneo/crema"
 }
