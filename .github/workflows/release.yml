@@ -31,10 +31,21 @@ jobs:
       - name: Build classic tablet skin
         run: ./build.sh
 
+      # The release notes are the tag's own annotation, so what you write in
+      # `git tag -a` is what people read on the release page. Without this the
+      # action generates a bare commit list and the changelog never ships.
+      - name: Release notes from the tag annotation
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          git fetch --force --tags --depth=1
+          git tag -l --format='%(contents)' "${GITHUB_REF_NAME}" > /tmp/notes.md
+          cat /tmp/notes.md
+
       - name: Publish both installable skins
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          body_path: /tmp/notes.md
           generate_release_notes: true
           files: |
             dist/Crema.zip
