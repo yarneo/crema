@@ -85,13 +85,33 @@ def _describe_failure(returncode: int, stderr: str, stdout: str) -> str:
     )
 
 
-def ask_text(prompt: str, timeout: int = 240) -> str:
-    """Run claude -p and return its raw text reply (for the provider mocks)."""
+def _argv() -> list[str]:
+    """The CLI invocation, with the prompt deliberately left off.
+
+    Two things are load-bearing here.
+
+    WebSearch is allowed. Without it `claude -p` has no tools at all and can
+    only answer from memory, which is how the advisor ended up telling a
+    barista "I'm unsure of the Lagom 01's dial marks" about a grinder whose
+    espresso range is published in several places. With search it finds 0.7-1.1
+    and says so.
+
+    And the prompt goes over stdin, not argv. `--allowedTools` is variadic, so
+    a trailing positional prompt is swallowed as another tool name; stdin also
+    sidesteps ARG_MAX, which a prompt carrying a few hundred curve samples can
+    approach.
+    """
     claude = find_claude()
     if not claude:
         raise ClaudeError("claude CLI not found on this machine")
+    return [claude, "-p", "--model", _MODEL, "--output-format", "json", "--allowedTools", "WebSearch"]
+
+
+def ask_text(prompt: str, timeout: int = 240) -> str:
+    """Run claude -p and return its raw text reply (for the provider mocks)."""
     result = subprocess.run(
-        [claude, "-p", "--model", _MODEL, "--output-format", "json", prompt],
+        _argv(),
+        input=prompt,
         capture_output=True, text=True, timeout=timeout,
         env={**os.environ, "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "8000"},
     )
@@ -105,12 +125,9 @@ def ask_text(prompt: str, timeout: int = 240) -> str:
 
 def ask_json(prompt: str, timeout: int = 240) -> dict:
     """Run claude -p and parse a JSON object out of its reply."""
-    claude = find_claude()
-    if not claude:
-        raise ClaudeError("claude CLI not found on this machine")
-
     result = subprocess.run(
-        [claude, "-p", "--model", _MODEL, "--output-format", "json", prompt],
+        _argv(),
+        input=prompt,
         capture_output=True,
         text=True,
         timeout=timeout,

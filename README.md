@@ -13,6 +13,18 @@ Crema talks to it directly over your wifi. No companion app, no server, no accou
 > bugs still surface. If you hit one, please [open an issue](../../issues) — and if
 > you'd like to help build it, see [Contributing](#contributing). PRs very welcome.
 
+## Choose your app
+
+- **Decaid (Android, iPad, macOS, Windows, Linux):** in Decaid open
+  **Launcher → Skins → + → GitHub Release**, enter `yarneo/crema`, and choose
+  **`Crema-Decaid.zip`**. Do not install the `decaid` source branch itself;
+  Decaid needs the built archive with `index.html` at its root.
+- **Classic DE1 app (Android tablet):** use **`Crema.zip`** and follow the
+  tablet steps below.
+
+The Decaid source, development guide, and local ZIP workflow live in
+[`web/README.md`](web/README.md).
+
 <table>
   <tr>
     <td width="33%" valign="top"><img src="docs/screenshots/1-brew.png" alt="Brew screen with live shot graph"><br><sub><b>1 · Pull a shot.</b> Calm home screen with your live graph, grind number, bean, and ratio.</sub></td>
@@ -23,8 +35,9 @@ Crema talks to it directly over your wifi. No companion app, no server, no accou
 
 ## What it does
 
-- **Beautiful shot visualization** — a dark, calm home screen with your live shot
-  graph, grind number, bean, and ratio front and center.
+- **Beautiful shot visualization** — a dark, calm home screen with live targets,
+  the previous-shot overlay, grind number, bean, and ratio front and center; tap
+  through for temperature, weight, phases, and full-size curves.
 - **Post-shot coaching** — a ≤10-second questionnaire (taste, body, flow look,
   finish, 1–5 score) feeds the AI along with the actual shot curves.
 - **One clear instruction** — advice comes back as a diagnosis plus *one* concrete
@@ -34,7 +47,10 @@ Crema talks to it directly over your wifi. No companion app, no server, no accou
   pressure), the AI writes a full D-Flow profile and Crema installs it as its own
   bean-specific profile.
 - **Shot history** — every shot, its taste notes, and the advice you got, stored
-  locally on the tablet. The AI reads your history so its advice compounds over time.
+  locally on the tablet. Reopen one to disagree, re-run the AI review, apply its
+  change, or delete it; each bean also gets its own tuning trail.
+- **Device controls that explain themselves** — machine and scale connection are
+  visible and actionable on Brew, with one-tap scale tare when connected.
 
 ## A quick tour
 

@@ -261,3 +261,63 @@ test('a created profile proposes its own title as the next profile', () => {
   assert.equal(profileChange?.to, 'AI Gesha');
   assert.equal(profileChange?.reason, 'needs a longer bloom');
 });
+
+// ---- an authored profile is written to the machine, so it is bounded -------
+
+/** The advice envelope, with only the profile block that matters here. */
+const withProfile = (created: unknown) =>
+  JSON.stringify({
+    diagnosis: 'Shape is wrong.',
+    confidence: 'medium',
+    evidence: [],
+    actions: {
+      grind: { delta: 0, target: null, reason: '' },
+      dose_g: { value: null, reason: '' },
+      target_yield_g: { value: null, reason: '' },
+      temperature_c: { value: null, reason: '' }
+    },
+    profile: { action: 'create', switch_to: null, created_profile: created, reason: 'shape' },
+    screen_summary: 'New profile.'
+  });
+
+const step = (over: Record<string, unknown> = {}) => ({
+  name: 'extract', pump: 'pressure', transition: 'fast', temperature: 93,
+  seconds: 20, volume: 0, weight: 0, sensor: 'coffee', pressure: 9, exit: null, ...over
+});
+
+test('a created profile is clamped to what a DE1 accepts', () => {
+  // Stating the limits in the prompt is not enforcing them. This goes straight
+  // to the machine.
+  const parsed = parseAdvice(withProfile({
+    title: 'Too much', steps: [step({ pressure: 15 }), step({ pump: 'flow', flow: 99, pressure: undefined })]
+  }), {});
+  assert.ok(parsed.ok);
+  const steps = parsed.advice.profile.createdProfile!.steps;
+  assert.equal(steps[0]!.pressure, 10, 'pressure capped at 10 bar');
+  assert.equal(steps[1]!.flow, 8, 'flow capped at 8 mL/s');
+});
+
+test('an authored temperature cannot scald or freeze the puck', () => {
+  const hot = parseAdvice(withProfile({ title: 'Hot', steps: [step({ temperature: 130 })] }), {});
+  const cold = parseAdvice(withProfile({ title: 'Cold', steps: [step({ temperature: 20 })] }), {});
+  assert.ok(hot.ok && cold.ok);
+  assert.equal(hot.advice.profile.createdProfile!.steps[0]!.temperature, 98);
+  assert.equal(cold.advice.profile.createdProfile!.steps[0]!.temperature, 80);
+});
+
+test('a profile longer than the DE1 allows is truncated, not rejected', () => {
+  const many = Array.from({ length: 12 }, () => step());
+  const parsed = parseAdvice(withProfile({ title: 'Long', steps: many }), {});
+  assert.ok(parsed.ok);
+  assert.equal(parsed.advice.profile.createdProfile!.steps.length, 6);
+});
+
+test('values already inside the limits are left exactly as given', () => {
+  const parsed = parseAdvice(withProfile({
+    title: 'Fine', steps: [step({ pressure: 8.5, temperature: 92.5 })]
+  }), {});
+  assert.ok(parsed.ok);
+  const only = parsed.advice.profile.createdProfile!.steps[0]!;
+  assert.equal(only.pressure, 8.5);
+  assert.equal(only.temperature, 92.5);
+});

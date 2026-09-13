@@ -189,13 +189,44 @@ export function readEvidence(raw: unknown, durationS?: number): { windows: Evide
 // Profile
 // ---------------------------------------------------------------------------
 
+/**
+ * What a DE1 will actually do, ported from the Tcl skin's prompt.
+ *
+ * These were stated to the model there and nowhere here — and stating them is
+ * not the same as enforcing them. A created profile is written straight to the
+ * machine, so a model that returns fifteen bar must not be able to send it.
+ */
+const DE1_LIMITS = {
+  pressureBar: { min: 0, max: 10 },
+  flowMlS: { min: 0, max: 8 },
+  temperatureC: { min: 80, max: 98 },
+  steps: { min: 1, max: 6 }
+} as const;
+
+const clampTo = (value: number, bounds: { min: number; max: number }): number =>
+  Math.min(bounds.max, Math.max(bounds.min, value));
+
+/** Bring one authored step inside what the machine accepts. */
+function clampStep(step: ProfileStep): ProfileStep {
+  const next: ProfileStep = { ...step };
+  if (typeof next.pressure === 'number') next.pressure = clampTo(next.pressure, DE1_LIMITS.pressureBar);
+  if (typeof next.flow === 'number') next.flow = clampTo(next.flow, DE1_LIMITS.flowMlS);
+  if (typeof next.temperature === 'number') {
+    next.temperature = clampTo(next.temperature, DE1_LIMITS.temperatureC);
+  }
+  return next;
+}
+
 function readCreatedProfile(raw: unknown): CreatedProfile | null {
   if (!isRecord(raw)) return null;
 
   const title = coerceString(raw['title']);
-  const steps = Array.isArray(raw['steps'])
+  const steps = (Array.isArray(raw['steps'])
     ? raw['steps'].map(readProfileStep).filter((s): s is ProfileStep => s !== null)
-    : [];
+    : []
+  )
+    .slice(0, DE1_LIMITS.steps.max)
+    .map(clampStep);
 
   // A profile with no title or no steps cannot be written to the machine.
   if (title === '' || steps.length === 0) return null;

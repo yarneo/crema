@@ -34,6 +34,35 @@ export interface ProviderConfig {
  * single biggest lever on advice quality, so these are a floor to get someone
  * running, not a recommendation.
  */
+export interface KnownModel {
+  id: string;
+  label: string;
+  /** What picking it means, in one line. */
+  note: string;
+}
+
+/**
+ * The models worth offering, so nobody has to guess an exact id.
+ *
+ * Free text asked people to know whether it was "opus", "opus 5", "opus-5" or
+ * "claude-opus-5" — four plausible spellings, one of which works. Anthropic's
+ * ids are listed exactly as published. The other providers keep a single known
+ * default rather than a list invented from memory: a wrong id in a picker is
+ * worse than a blank field, because it looks authoritative.
+ */
+export const KNOWN_MODELS: Record<ProviderId, readonly KnownModel[]> = {
+  anthropic: [
+    { id: 'claude-opus-5', label: 'Opus 5', note: 'Best reasoning. The one to pick if advice quality matters most.' },
+    { id: 'claude-fable-5-1', label: 'Fable 5.1', note: 'Most capable, and the most expensive.' },
+    { id: 'claude-sonnet-5', label: 'Sonnet 5', note: 'Strong and cheaper than Opus.' },
+    { id: 'claude-haiku-4-5', label: 'Haiku 4.5', note: 'Cheapest and quickest. Fine for straightforward dial-in.' }
+  ],
+  openai: [{ id: 'gpt-4o-mini', label: 'GPT-4o mini', note: 'A small, inexpensive default.' }],
+  google: [{ id: 'gemini-flash-lite-latest', label: 'Gemini Flash Lite', note: 'A small, inexpensive default.' }],
+  compatible: [{ id: 'llama3.1', label: 'Llama 3.1', note: 'A common local model name. Yours may differ.' }],
+  server: []
+} as const;
+
 export function defaultModel(provider: ProviderId): string {
   switch (provider) {
     case 'openai':
@@ -59,7 +88,10 @@ export function defaultBaseUrl(provider: ProviderId): string {
     case 'compatible':
       return 'http://localhost:11434';
     case 'server':
-      return 'http://localhost:8877';
+      // Deliberately blank. `localhost:8877` is right only when the skin runs
+      // on the Mac itself, and on a tablet it fails in a way that looks like
+      // the server is down. An empty field forces the address to be given.
+      return '';
     case 'anthropic':
       return 'https://api.anthropic.com';
   }

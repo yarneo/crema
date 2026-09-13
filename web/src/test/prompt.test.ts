@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildPrompt, daysOffRoast, type AdviceRequest } from '../advice/prompt.ts';
+import { buildPrompt, buildStarterPrompt, daysOffRoast, type AdviceRequest } from '../advice/prompt.ts';
 import { buildTrail } from '../domain/trail.ts';
 import { EMPTY_RATING, describeRating, isRated, ratingCompleteness } from '../domain/rating.ts';
 import type { Recipe } from '../domain/recipe.ts';
@@ -111,6 +111,19 @@ test('the prompt has no runs of blank lines', () => {
   assert.ok(!/\n\n\n/.test(buildPrompt(request, NOW)));
 });
 
+test('a starter is explicit about having no shot evidence and uses installed profile names', () => {
+  const prompt = buildStarterPrompt({
+    bean: request.bean,
+    grinder: request.grinder,
+    recipe,
+    profileTitles: ['Adaptive v3', 'Blooming Espresso']
+  }, NOW);
+  assert.match(prompt, /NO shot data/);
+  assert.match(prompt, /Evidence must be an empty array/);
+  assert.match(prompt, /Adaptive v3/);
+  assert.match(prompt, /absolute grind target, dose, target yield, and temperature/);
+});
+
 // ---- roast age ------------------------------------------------------------
 
 test('roast age handles missing, malformed and absurd dates', () => {
@@ -198,7 +211,9 @@ test('a record with curves and no score is reopened', () => {
     advice: null,
     applied: []
   };
-  assert.equal(needsRating(fresh), true);
+  assert.equal(needsRating(fresh, fresh.at), true);
+  assert.equal(needsRating({ ...fresh, deferred: true }, fresh.at), false, 'Rate later stays dismissed after reload');
+  assert.equal(needsRating(fresh, fresh.at + 31 * 60 * 1000), false, 'an old unrated shot does not hijack every launch');
 });
 
 test('an already-scored record is not reopened', () => {
@@ -272,4 +287,60 @@ test('an undated bag simply omits the age rather than guessing', () => {
   const prompt = buildPrompt({ ...request, bean: { ...request.bean, roastDate: null } }, NOW);
   assert.ok(!prompt.includes('off roast'));
   assert.match(prompt, /Moonwake La Estrella Gesha/, 'the bean is still named');
+});
+
+// ---- the first shot of a new bag -----------------------------------------
+
+const starterRequest = {
+  bean: { name: 'luis anabel', roaster: 'Rose', roastDate: '2026-09-02', roastLevel: 'Medium' },
+  grinder: { name: 'Lagom 01', range: '0-1.5' },
+  recipe: { profileTitle: 'Adaptive v3', grind: 1.5, doseG: 18, targetYieldG: 36, temperatureC: 93 },
+  profileTitles: ['Adaptive v3']
+};
+
+test('the first-shot prompt never quotes the grind left on the dial', () => {
+  // Naming it as a "machine default" anchored the model to it: asked for a
+  // starting point with 1.5 sitting on the dial, it proposed an adjustment of
+  // 1.5 rather than a setting for the grinder.
+  const prompt = buildStarterPrompt(starterRequest);
+  assert.ok(!/grind 1\.5/.test(prompt), 'the leftover value is not restated as context');
+  assert.ok(!/machine defaults/.test(prompt), 'and it is not called a default');
+  assert.match(prompt, /left over from whatever was brewed before/);
+  assert.match(prompt, /dose 18g/, 'dose, yield and temperature are real settings and stay');
+});
+
+test('the first-shot prompt asks for an absolute setting, not a move', () => {
+  const prompt = buildStarterPrompt(starterRequest);
+  assert.match(prompt, /absolute setting in its dial units/);
+  assert.ok(!/size your move/.test(prompt), 'there is nothing to move from before a shot');
+});
+
+test('the named grinder is to be looked up rather than guessed at', () => {
+  // The advisor runs with web search. Told only to "use what you know", it
+  // answered a barista with "I'm unsure of the Lagom 01's dial marks" about a
+  // grinder whose espresso window is published in several places.
+  const prompt = buildStarterPrompt(starterRequest);
+  assert.match(prompt, /Grinder: Lagom 01/);
+  assert.match(prompt, /Look up this grinder/);
+  assert.match(prompt, /do not guess and do not hedge/);
+});
+
+test('a hand-typed range loses to what the grinder actually is', () => {
+  const prompt = buildStarterPrompt(starterRequest);
+  assert.match(prompt, /typed its range as roughly 0-1\.5/);
+  assert.match(prompt, /if what you find for this grinder disagrees, use what you find/);
+});
+
+test('with no grinder configured it stays conservative rather than inventing a scale', () => {
+  const prompt = buildStarterPrompt({ ...starterRequest, grinder: { name: null, range: null } });
+  assert.match(prompt, /not named/);
+  assert.match(prompt, /keep the number conservative/);
+});
+
+test('reasons justify the number; uncertainty belongs to the confidence field', () => {
+  // "I'm unsure of the dial marks" is not advice — and it appeared in a reason
+  // row, under a number, where it reads as the justification for it.
+  const prompt = buildStarterPrompt(starterRequest);
+  assert.match(prompt, /Do not write about your own uncertainty there/);
+  assert.match(prompt, /that is what the confidence field is for/);
 });

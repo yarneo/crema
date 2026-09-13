@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "test": "node --test --experimental-strip-types \"src/test/*.test.ts\"",
     "validate:manifest": "node scripts/validate-manifest.mjs",
-    "release:zip": "npm run build && npm run validate:manifest && rm -f crema-skin.zip && (cd dist && zip -qr ../crema-skin.zip . -x '*.DS_Store')"
+    "release:zip": "npm run build && npm run validate:manifest && rm -f Crema-Decaid.zip && (cd dist && zip -qr ../Crema-Decaid.zip . -x '*.DS_Store')"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",

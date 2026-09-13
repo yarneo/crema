@@ -59,9 +59,53 @@ export interface MachineStateWire {
   state?: { state?: string; substate?: string };
   flow?: number;
   pressure?: number;
+  targetFlow?: number;
+  targetPressure?: number;
   groupTemperature?: number;
   mixTemperature?: number;
+  targetGroupTemperature?: number;
+  targetMixTemperature?: number;
   steamTemperature?: number;
+}
+
+/** Hardware identity and fitted controls reported by Decaid. */
+export interface MachineInfoWire {
+  version?: string;
+  model?: string;
+  serialNumber?: string;
+  /** True when the DE1 has the physical group-head controller. */
+  GHC?: boolean;
+  extra?: Record<string, unknown>;
+}
+
+/** Scale frames arrive on their own stream, not in the machine snapshot. */
+export interface ScaleSnapshotWire {
+  timestamp?: string;
+  weight?: number;
+  weightFlow?: number;
+  battery?: number | null;
+  timerValue?: number | null;
+}
+
+export interface WaterLevelsWire {
+  /** Current water height in the tank, in millimetres. */
+  currentLevel?: number;
+  refillLevel?: number;
+}
+
+export interface DeviceInfoWire {
+  name: string;
+  id: string;
+  state: 'connected' | 'disconnected' | 'discovered' | string;
+  type: 'machine' | 'scale' | 'sensor' | string;
+  available?: boolean;
+}
+
+/** Full connection snapshot emitted by /ws/v1/devices. */
+export interface DevicesStateWire {
+  timestamp?: string;
+  devices?: DeviceInfoWire[];
+  scanning?: boolean;
 }
 
 /** A profile as listed by the gateway: the definition plus its content hash. */

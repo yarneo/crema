@@ -1,0 +1,39 @@
+<!doctype html><meta charset="utf-8"><title>iPad harness</title>
+<!--
+  A rehearsal rig for the hardware insets, served by `vite dev` only (it lives
+  outside public/, so it is not part of a build).
+
+    http://127.0.0.1:5173/dev/ipad.html?w=1194&h=834&inset=21
+
+  Desktop Chrome reports no safe-area inset, which is precisely why the tab
+  dock could sit under an iPad's home indicator for as long as it did. This
+  frames the skin at a real iPad size, draws the indicator strip, and injects
+  the inset the stylesheet reads through --safe-bottom.
+-->
+<style>
+ body{margin:0;background:#444;font:12px -apple-system,sans-serif;color:#fff;display:flex;flex-wrap:wrap;gap:10px;padding:10px}
+ figure{margin:0}
+ figcaption{padding:2px 0}
+ .dev{position:relative;background:#000;border-radius:10px;overflow:hidden}
+ iframe{border:0;display:block}
+ /* simulate the iPad home-indicator safe area strip */
+ .safe{position:absolute;left:0;right:0;bottom:0;background:repeating-linear-gradient(45deg,#e0245e55 0 6px,transparent 6px 12px);pointer-events:none}
+ .safe::after{content:'';position:absolute;left:50%;transform:translateX(-50%);bottom:6px;width:38%;height:5px;border-radius:3px;background:#fff9}
+</style>
+<div id="host"></div>
+<script>
+ const q = new URLSearchParams(location.search);
+ const src = q.get('src') || '/?empty=1';
+ const w = +(q.get('w')||1194), h = +(q.get('h')||834), inset = +(q.get('inset')||21);
+ const host = document.getElementById('host');
+ host.innerHTML = '<figure><figcaption>'+w+'×'+h+' — safe-area-inset-bottom '+inset+'px</figcaption>'+
+   '<div class="dev" style="width:'+w+'px;height:'+h+'px"><iframe src="'+src+'" width="'+w+'" height="'+h+'"></iframe>'+
+   '<div class="safe" style="height:'+inset+'px"></div></div></figure>';
+ // Desktop Chrome reports no safe-area inset, so the iPad's home indicator has
+ // to be injected: the stylesheet reads its insets through --safe-* for exactly
+ // this reason.
+ const frame = host.querySelector('iframe');
+ frame.addEventListener('load', () => {
+   frame.contentDocument.documentElement.style.setProperty('--safe-bottom', inset + 'px');
+ });
+</script>

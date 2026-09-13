@@ -1,8 +1,21 @@
-# Crema for Decent.app (port in progress)
+# Crema for Decaid
 
-This directory is the port of Crema from a Tcl **de1app** skin to a **Decent.app /
-Decaid** skin. The Tcl skin still lives in [`../skin/Crema`](../skin/Crema) and
-still works; nothing here replaces it yet.
+This is the Decaid edition of Crema: the same shot-first dial-in coach as the
+classic Tcl skin, built for Decaid's Android, iOS, macOS, Windows, and Linux
+runtime. The Tcl skin still lives in [`../skin/Crema`](../skin/Crema).
+
+## Install
+
+Do not install the repository branch archive directly: its root contains the
+source tree, not the skin entry point. Use the purpose-built release asset:
+
+1. In Decaid, open **Launcher → Skins**, tap **+**, then choose **GitHub Release**.
+2. Enter `yarneo/crema` and select the asset **`Crema-Decaid.zip`**.
+3. Select **Crema** from the skin list.
+
+For a local build, run `npm run release:zip` here and install the resulting
+`Crema-Decaid.zip` with **Launcher → Skins → + → ZIP file**. The archive puts
+`index.html` and `manifest.json` at its root, which Decaid requires.
 
 ## Why port
 
@@ -35,8 +48,9 @@ browser (this skin)  ──HTTP/WS──▶  Decaid :8080  ──BLE/Serial─�
 
 Key endpoints for us: `/api/v1/workflow` (the recipe we apply),
 `/api/v1/profiles` (profile authorship), `/api/v1/shots` (history),
-`/api/v1/store/{namespace}/{key}` (our settings), and
-`/ws/v1/machine/snapshot` (live shot telemetry).
+`/api/v1/store/{namespace}/{key}` (our records), `/api/v1/devices`
+(connection controls), `/api/v1/scale/tare`, and `/ws/v1/machine/snapshot`
+(live shot telemetry).
 
 ## Layout
 
@@ -82,10 +96,10 @@ and let Decaid install it — the app's container is sandboxed, so copying files
 in by hand fails with "Operation not permitted":
 
 ```bash
-npm run release:zip
+npm run release:zip # creates Crema-Decaid.zip
 python3 -m http.server 8899 --bind 127.0.0.1 &   # serve the zip
 curl -X POST http://localhost:8080/api/v1/webui/skins/install/url \
-  -H 'Content-Type: application/json' -d '{"url":"http://127.0.0.1:8899/crema-skin.zip"}'
+  -H 'Content-Type: application/json' -d '{"url":"http://127.0.0.1:8899/Crema-Decaid.zip"}'
 curl -X PUT http://localhost:8080/api/v1/webui/skins/default \
   -H 'Content-Type: application/json' -d '{"skinId":"crema"}'
 ```
@@ -120,23 +134,29 @@ provable without hardware.
 - [x] Attempt log, so the advisor knows what already failed ([#8](https://github.com/yarneo/crema/issues/8))
 - [x] Structured advice schema with evidence windows, tolerant parsing ([#10](https://github.com/yarneo/crema/issues/10))
 - [x] Profile authorship parsing, and the grind rules ported from Tcl
+- [x] Existing-profile switches and AI-authored profiles, applied before their numeric recipe changes
 - [x] Gateway client: REST, workflow read/apply/undo, timeouts ([#7](https://github.com/yarneo/crema/issues/7))
 - [x] Verified end to end against a live Decaid 0.8.4: apply and undo round-trip exactly
-- [ ] WebSocket telemetry for the live shot
+- [x] WebSocket telemetry for the live shot, including machine targets, temperature, scale weight and weight flow
 - [x] Provider clients: Anthropic, OpenAI, Google, OpenAI-compatible, Mac server
 - [x] Shot-curve preparation: downsampling, weight-curve gating
 - [x] Flow-phase analysis: stall pressure decides grind vs profile
-- [x] First screen: status strip, recipe row, advice diff, evidence band, trail
-- [ ] Prompt assembly (wiring the pieces into one request)
+- [x] First screen: actionable device status, recipe row, live metrics, comparison graph, and tappable AI summary
+- [x] Prompt assembly (wiring the pieces into one request)
 - [x] Navigation, and the screens behind it: Profiles, Beans, Shots, Setup
 - [x] WebSocket live shot: start/end detection, curve capture, reconnect
 - [x] Rating a shot, and asking a real provider for advice on it
 - [x] Shot records in Decaid's key-value store, so they follow the user
-- [x] Reconsider: push back on the advice and have it re-examine the shot
+- [x] Reconsider and re-run AI review, both immediately and from any stored shot
 - [x] Bean bags with roast dates, so days-off-roast is real
 - [x] Machine controls: brew, steam, hot water, flush, rinse, sleep/wake
 - [x] Water tab: steam, hot-water and flush settings
-- [x] Shot detail: replay a stored shot with its rating and advice
+- [x] Bean-specific tuning history, including the convergence trail and the one change made between shots
+- [x] Bean presets restore the last applied grind/recipe/profile, with editable library details and two-tap removal
+- [x] Compact and expanded graphs with targets, the previous shot, temperature, total weight, and evidence windows
+- [x] Shot detail: replay curves and rating; get/re-run/disagree with advice; apply it; or two-tap delete the record
+- [x] Post-shot escape hatches: rate later, save without AI, and correct the grind actually used
+- [x] Machine/scale connection controls, including one-tap scale tare while connected
 
 Design rationale for the port and the UI direction is in the design brief; the
 ranked backlog is [issues #7–#16](https://github.com/yarneo/crema/issues).

@@ -59,3 +59,37 @@ export function resolveGrind(
 
   return null;
 }
+
+/**
+ * The dial range the barista typed in Settings, e.g. "0.1-0.5" or "1 – 12".
+ *
+ * Any dash will do — people type hyphens, en dashes and "to" — and the two
+ * numbers are returned low-first regardless of the order given.
+ */
+export function parseGrinderRange(raw: string | null | undefined): { min: number; max: number } | null {
+  if (!raw) return null;
+  const numbers = raw.match(/\d+(?:\.\d+)?/g);
+  if (!numbers || numbers.length < 2) return null;
+
+  const a = Number(numbers[0]);
+  const b = Number(numbers[1]);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || a === b) return null;
+
+  return { min: Math.min(a, b), max: Math.max(a, b) };
+}
+
+/**
+ * Where to start when the grind has never been set.
+ *
+ * The stepper is useless from nothing — it moves by 0.05, so reaching a Niche's
+ * 20 takes four hundred taps, and there is no way to know the barista's scale
+ * without being told. The configured range is the one honest hint we have, so
+ * the first nudge lands in the middle of it. With no range configured there is
+ * no defensible guess and this returns null; the value must be typed instead.
+ */
+export function startingGrind(range: string | null | undefined): number | null {
+  const parsed = parseGrinderRange(range);
+  if (parsed === null) return null;
+  const middle = snapGrind((parsed.min + parsed.max) / 2);
+  return isSaneGrind(middle) ? middle : null;
+}

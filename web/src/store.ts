@@ -13,32 +13,51 @@
 import type { Gateway } from './gateway/client.ts';
 import { EMPTY_RATING, type Rating } from './domain/rating.ts';
 import type { Recipe } from './domain/recipe.ts';
+import type { Advice } from './advice/schema.ts';
+import type { ShotCurves } from './advice/curves.ts';
 
 const NAMESPACE = 'crema';
 const INDEX_KEY = 'shot-index';
+const RETAINED_HISTORY = 100;
 
 export interface ShotRecord {
   /** Decaid's shot id, or a local id when the shot was never persisted. */
   id: string;
   at: number;
-  bean: { name: string | null; roaster: string | null };
+  bean: {
+    beanId?: string | null;
+    name: string | null;
+    roaster: string | null;
+    /** The specific bag matters: two roasts of one coffee are not one dial-in. */
+    batchId?: string | null;
+    roastDate?: string | null;
+    roastLevel?: string | null;
+  };
   recipe: Recipe;
   rating: Rating;
+  /** The barista deliberately postponed this rating; do not reopen it at boot. */
+  deferred?: boolean;
   finalYieldG: number | null;
   /**
    * The shot's curves, downsampled. Stored because a tablet that sleeps or a
    * reloaded page must still be able to rate the shot and ask for advice on
    * it — without these, a reload silently loses the cup in front of you.
    */
-  curves: { elapsedS: number[]; pressureBar: number[]; flowMlS: number[]; weightFlow: number[] | null } | null;
+  curves: ShotCurves | null;
   /** What the advisor said, kept so the attempt log can be rebuilt. */
-  advice: { summary: string; diagnosis: string } | null;
+  advice: { summary: string; diagnosis: string; full?: Advice } | null;
   /** Which fields we actually applied afterwards, for honest attribution. */
   applied: string[];
+  /** The next-shot setup after Apply; kept separate from what this shot used. */
+  appliedRecipe?: Recipe;
 }
 
 export interface ShotIndex {
   ids: string[];
+}
+
+export interface BeanDialIn {
+  recipe: Recipe;
 }
 
 export class Store {
@@ -87,10 +106,26 @@ export class Store {
   }
 
   /** Newest first, capped so a long history does not stall the screen. */
-  async readRecent(limit = 20): Promise<ShotRecord[]> {
+  async readRecent(limit = RETAINED_HISTORY): Promise<ShotRecord[]> {
     const ids = (await this.readIndex()).slice(-limit).reverse();
     const records = await Promise.all(ids.map((id) => this.readShot(id)));
     return records.filter((r): r is ShotRecord => r !== null);
+  }
+
+  readBeanDialIn(beanId: string): Promise<BeanDialIn | null> {
+    return this.get<BeanDialIn>(`bean-dial-in-${beanId}`);
+  }
+
+  saveBeanDialIn(beanId: string, recipe: Recipe): Promise<boolean> {
+    return this.set(`bean-dial-in-${beanId}`, { recipe });
+  }
+
+  async deleteBeanDialIn(beanId: string): Promise<void> {
+    try {
+      await this.gateway.request(this.key(`bean-dial-in-${beanId}`), { method: 'DELETE' });
+    } catch {
+      // A missing preset is already the desired result.
+    }
   }
 
   /**
@@ -109,13 +144,24 @@ export class Store {
     }
     return true;
   }
+
+  async deleteShot(id: string): Promise<boolean> {
+    try {
+      await this.gateway.request(this.key(`shot-${id}`), { method: 'DELETE' });
+      const ids = await this.readIndex();
+      await this.set(INDEX_KEY, { ids: ids.filter((candidate) => candidate !== id) });
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }
 
 /** A blank record for a shot that has just finished. */
 export function newShotRecord(
   id: string,
   recipe: Recipe,
-  bean: { name: string | null; roaster: string | null },
+  bean: ShotRecord['bean'],
   finalYieldG: number | null,
   curves: ShotRecord['curves'],
   at = Date.now()
@@ -155,6 +201,15 @@ export function hasCurves(record: ShotRecord): boolean {
 }
 
 /** True when a stored shot still needs rating — the one to reopen on boot. */
-export function needsRating(record: ShotRecord): boolean {
-  return (record.rating?.score ?? null) === null && hasCurves(record);
+const PENDING_RATING_MAX_AGE_MS = 30 * 60 * 1000;
+
+export function needsRating(record: ShotRecord, now = Date.now()): boolean {
+  const age = now - record.at;
+  return (
+    record.deferred !== true &&
+    (record.rating?.score ?? null) === null &&
+    age >= 0 &&
+    age <= PENDING_RATING_MAX_AGE_MS &&
+    hasCurves(record)
+  );
 }

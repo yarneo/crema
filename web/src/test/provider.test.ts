@@ -1,19 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
-  askProvider,
-  buildRequest,
-  describeHttpError,
-  endpointFor,
-  extractErrorDetail,
-  extractReplyText,
-  isConfigured,
-  isReasoningModel,
-  ProviderError,
-  resolveModel,
-  type ProviderConfig
-} from '../advice/provider.ts';
+import { DEFAULT_SETTINGS, isReady } from '../settings.ts';
+
+const blankSettings = { ...DEFAULT_SETTINGS };
+
+import { askProvider, buildRequest, describeHttpError, endpointFor, extractErrorDetail, extractReplyText, isConfigured, isReasoningModel, ProviderError, resolveModel, type ProviderConfig, KNOWN_MODELS, PROVIDERS, defaultModel, defaultBaseUrl } from '../advice/provider.ts';
 
 function stubFetch(handler: (url: string, init?: RequestInit) => Response) {
   return ((url: string, init?: RequestInit) => Promise.resolve(handler(url, init))) as unknown as typeof fetch;
@@ -30,7 +22,7 @@ test('each provider resolves to its documented endpoint', () => {
     'the Google base already carries its version segment'
   );
   assert.equal(endpointFor({ provider: 'compatible' }), 'http://localhost:11434/v1/chat/completions');
-  assert.equal(endpointFor({ provider: 'server' }), 'http://localhost:8877/v1/chat/completions');
+  assert.equal(endpointFor({ provider: 'server' }), '/v1/chat/completions');
 });
 
 test('a custom base URL wins and its trailing slash is trimmed', () => {
@@ -252,4 +244,34 @@ test('error details are pulled from either envelope shape', () => {
 
 test('a detail-less self-hosted 500 still says what happened', () => {
   assert.match(describeHttpError('server', 503, ''), /HTTP 503 with no detail/);
+});
+
+// ---- choosing a model without having to know its exact id -----------------
+
+test('every offered Anthropic model is a published id, not a guess', () => {
+  // "opus", "opus 5", "opus-5" and "claude-opus-5" are all plausible and only
+  // one works. That is the reason the picker exists, so the list must be right.
+  const ids = KNOWN_MODELS.anthropic.map((m) => m.id);
+  assert.deepEqual(ids, ['claude-opus-5', 'claude-fable-5-1', 'claude-sonnet-5', 'claude-haiku-4-5']);
+  for (const id of ids) {
+    assert.ok(!/\d{8}$/.test(id), `${id} carries a date suffix it should not`);
+    assert.equal(id, id.toLowerCase().trim());
+  }
+});
+
+test('every provider default is itself offered, or is the blank default', () => {
+  for (const provider of PROVIDERS) {
+    const fallback = defaultModel(provider);
+    const offered = KNOWN_MODELS[provider].map((m) => m.id);
+    if (offered.length === 0) continue; // the local server chooses its own
+    assert.ok(offered.includes(fallback), `${provider}: default ${fallback} is not in the list`);
+  }
+});
+
+test('the local server has no address by default, so it cannot look configured', () => {
+  // localhost:8877 is right only on the Mac itself; on a tablet it failed in a
+  // way that looked like the server was down.
+  assert.equal(defaultBaseUrl('server'), '');
+  assert.equal(isReady({ ...blankSettings, provider: 'server' }), false);
+  assert.equal(isReady({ ...blankSettings, provider: 'server', baseUrl: 'http://mac.local:8877' }), true);
 });

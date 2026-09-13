@@ -15,6 +15,8 @@ import type {
   BeanBatchWire,
   CommandableState,
   BeanWire,
+  DeviceInfoWire,
+  MachineInfoWire,
   MachineStateWire,
   ProfileEntryWire,
   ProfileWire,
@@ -137,15 +139,24 @@ export class Gateway {
     return toWebSocketOrigin(this.origin);
   }
 
-  async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  /**
+   * `timeoutMs` overrides the client's deadline for one call. Most routes
+   * answer immediately and the short default is what keeps a dead gateway
+   * from hanging the screen — but a Bluetooth scan legitimately takes longer
+   * than that, and cutting it off looks exactly like a button that does
+   * nothing.
+   */
+  async request<T>(path: string, init: RequestInit & { timeoutMs?: number } = {}): Promise<T> {
+    const { timeoutMs, ...fetchInit } = init;
+    const deadline = timeoutMs ?? this.timeoutMs;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    const timer = setTimeout(() => controller.abort(), deadline);
 
     let response: Response;
     try {
-      response = await this.doFetch(`${this.origin}${path}`, { ...init, signal: controller.signal });
+      response = await this.doFetch(`${this.origin}${path}`, { ...fetchInit, signal: controller.signal });
     } catch (cause) {
-      if ((cause as Error)?.name === 'AbortError') throw new GatewayTimeoutError(path, this.timeoutMs);
+      if ((cause as Error)?.name === 'AbortError') throw new GatewayTimeoutError(path, deadline);
       throw new GatewayError(0, path, `Could not reach the gateway: ${(cause as Error).message}`);
     } finally {
       clearTimeout(timer);
@@ -174,6 +185,11 @@ export class Gateway {
     return this.request<MachineStateWire>('/api/v1/machine/state');
   }
 
+  /** Machine model and fitted hardware, including the physical GHC controls. */
+  readMachineInfo(): Promise<MachineInfoWire> {
+    return this.request<MachineInfoWire>('/api/v1/machine/info');
+  }
+
   /**
    * Apply a partial recipe change. Decaid uploads it to the machine and
    * returns the complete updated workflow, which is what we render from — the
@@ -190,6 +206,14 @@ export class Gateway {
   /** Every profile the gateway knows, each wrapped with its content hash id. */
   readProfiles(): Promise<ProfileEntryWire[]> {
     return this.request<ProfileEntryWire[]>('/api/v1/profiles');
+  }
+
+  createProfile(profile: ProfileWire): Promise<ProfileEntryWire> {
+    return this.request<ProfileEntryWire>('/api/v1/profiles', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ profile })
+    });
   }
 
   /**
@@ -216,6 +240,18 @@ export class Gateway {
     });
   }
 
+  updateBean(id: string, bean: Partial<BeanWire>): Promise<BeanWire> {
+    return this.request<BeanWire>(`/api/v1/beans/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(bean)
+    });
+  }
+
+  deleteBean(id: string): Promise<unknown> {
+    return this.request(`/api/v1/beans/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  }
+
   /**
    * Command the machine.
    *
@@ -224,6 +260,58 @@ export class Gateway {
    */
   setState(state: CommandableState): Promise<void> {
     return this.request<void>(`/api/v1/machine/state/${state}`, { method: 'PUT' });
+  }
+
+  readDevices(): Promise<DeviceInfoWire[]> {
+    return this.request<DeviceInfoWire[]>('/api/v1/devices');
+  }
+
+  /** Ask Decaid to discover and fill any missing machine/scale slots. */
+  /**
+   * Find and connect ONE device, leaving everything else alone.
+   *
+   * `scan?connect=true` connects whatever it discovers, which is a shotgun:
+   * asking for the scale churned Bluetooth for the machine as well, and a DE1
+   * that is mid-handshake drops. Scanning is discovery-only here, and the one
+   * device the barista asked for is connected by id.
+   *
+   * The quick scan runs first because it answers in about a second, but it is
+   * not reliable — on a real DE1 it comes back empty while a full scan finds
+   * the machine every time — so an empty quick result falls through rather
+   * than being reported as "nothing there".
+   */
+  async connectKind(kind: 'machine' | 'scale'): Promise<DeviceInfoWire[]> {
+    const usable = (devices: DeviceInfoWire[] | null): DeviceInfoWire | undefined =>
+      (devices ?? []).find(
+        (device) => device.type === kind && device.available !== false && device.state !== 'connected'
+      );
+
+    const quick = await this.request<DeviceInfoWire[]>('/api/v1/devices/scan?quick=true', {
+      timeoutMs: 6000
+    }).catch(() => null);
+
+    let target = usable(quick);
+    if (!target) {
+      const full = await this.request<DeviceInfoWire[]>('/api/v1/devices/scan', {
+        timeoutMs: 25000
+      }).catch(() => null);
+      target = usable(full);
+    }
+
+    if (target?.id) await this.connectDevice(target.id);
+    return this.readDevices();
+  }
+
+  connectDevice(deviceId: string): Promise<unknown> {
+    return this.request('/api/v1/devices/connect', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ deviceId })
+    });
+  }
+
+  tareScale(): Promise<void> {
+    return this.request<void>('/api/v1/scale/tare', { method: 'PUT' });
   }
 
   readBatches(beanId: string): Promise<BeanBatchWire[]> {

@@ -52,6 +52,14 @@ export interface AdviceRequest {
   priorDiagnosis?: string;
 }
 
+export interface StarterRequest {
+  bean: BeanContext;
+  grinder: GrinderContext;
+  recipe: Recipe;
+  /** Exact installed titles, so a switch never invents a profile name. */
+  profileTitles: readonly string[];
+}
+
 /** Whole days since roast, or null when unknown or implausible. */
 export function daysOffRoast(roastDate: string | null, now = Date.now()): number | null {
   if (!roastDate) return null;
@@ -76,6 +84,30 @@ function grinderLine(grinder: GrinderContext): string {
     ? ` Its usable espresso range is roughly ${grinder.range.trim()}, so size your move to that window.`
     : '';
   return `Grinder: ${name}. Express any grind change in ITS dial units.${range}`;
+}
+
+/**
+ * The grinder, for a first shot.
+ *
+ * `grinderLine` speaks of sizing a *move*, which is right after a shot and
+ * wrong before one: there is nothing to move from. This asks for an absolute
+ * choice instead, and is explicit that the range is user-entered — it is
+ * frequently rough or plain wrong, so a model that knows the actual grinder
+ * should not be talked out of its own number by a bad range.
+ */
+function starterGrinderLine(grinder: GrinderContext): string {
+  const name = grinder.name?.trim();
+  const range = grinder.range?.trim();
+
+  const who = name
+    ? `Grinder: ${name}. Look up this grinder's dial and its usual espresso window if you are not certain of them — you have web search, so do not guess and do not hedge.`
+    : 'Grinder: not named, so assume a common espresso grinder and keep the number conservative.';
+
+  const window = range
+    ? ` The user typed its range as roughly ${range}. That is their own estimate; if what you find for this grinder disagrees, use what you find.`
+    : '';
+
+  return `${who}${window} Give the grind as an absolute setting in its dial units.`;
 }
 
 function recipeLine(recipe: Recipe, finalYieldG: number | null, durationS: number | null): string {
@@ -157,4 +189,38 @@ export function buildPrompt(request: AdviceRequest, now = Date.now()): string {
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+/** Build a first-shot recommendation when a new bag has no evidence yet. */
+export function buildStarterPrompt(request: StarterRequest, now = Date.now()): string {
+  const current = request.recipe;
+  return [
+    'You are an expert espresso barista helping choose a safe FIRST shot on a Decent DE1.',
+    'There is NO shot data for this bag. Do not pretend there is. Give a starting point to dial in from, not a final diagnosis.',
+    '',
+    beanLine(request.bean, now),
+    starterGrinderLine(request.grinder),
+    // Deliberately without the current grind. Whatever is on the dial is left
+    // over from another coffee — often a number typed to see what happened —
+    // and naming it as a "default" anchored the model to it instead of
+    // choosing a setting for this grinder. Dose, yield and temperature are
+    // real machine settings and stay.
+    `Current machine settings (context only): profile ${current.profileTitle ?? 'unknown'}, dose ${current.doseG ?? '?'}g, target ${current.targetYieldG ?? '?'}g, temperature ${current.temperatureC ?? '?'}C.`,
+    'The grind currently on the dial is left over from whatever was brewed before and carries no information about this coffee. Ignore it and choose from the grinder itself.',
+    `Installed profile titles (switch_to must match one exactly): ${JSON.stringify(request.profileTitles)}.`,
+    '',
+    'Use roast level and freshness as the strongest evidence. Light roasts usually want more heat, a longer ratio, and gentle preinfusion; dark roasts usually want less heat and a shorter ratio.',
+    'For the grind, give an absolute setting on this grinder\u2019s own scale, reasoned from the grinder itself: what you know of that model\u2019s dial, where espresso normally falls on it, and the stated range. Espresso usually sits in the finer part of a grinder\u2019s overall travel, well below the midpoint of a range that also covers filter.',
+    'Choose a forgiving, slightly-fine setting rather than a gushing one.',
+    // The Tcl wording: switching is preferred, but creating is a real
+    // alternative rather than a last resort, and the roast picks the shape.
+    'Fill an absolute grind target, dose, target yield, and temperature.',
+    'For the profile: prefer SWITCHING to an installed profile that fits the roast — a balanced pressure profile for a medium, a gentle bloom or higher temperature for a light, a lower-temperature or declining one for a dark — OR create a simple 2-4 step profile if that serves this bean better.',
+    'Evidence must be an empty array because no shot exists. Confidence should reflect how little is known.',
+    'Every reason is read by a barista standing at the machine as the justification for a number. State what the setting is based on — the grinder, the roast, the age of the bag. Do not write about your own uncertainty there; that is what the confidence field is for.',
+    'Respond with ONLY one valid JSON object, no prose or markdown.',
+    '',
+    '## SCHEMA',
+    ADVICE_SCHEMA_TEXT
+  ].join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }

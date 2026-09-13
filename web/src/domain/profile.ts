@@ -182,3 +182,70 @@ export function shiftProfileTemperature(profile: Profile, deltaC: number): Profi
     )
   };
 }
+
+// ---------------------------------------------------------------------------
+// What a profile intends to do
+// ---------------------------------------------------------------------------
+
+/** One moment in a profile's plan. A step targets pressure or flow, never both. */
+export interface PlanPoint {
+  t: number;
+  pressure: number | null;
+  flow: number | null;
+}
+
+/** The target a step holds, and which axis it belongs on. */
+function stepTarget(step: ProfileStep): { pressure: number | null; flow: number | null } {
+  if (step.pump === 'flow') {
+    return { pressure: null, flow: typeof step.flow === 'number' ? step.flow : 0 };
+  }
+  return { pressure: typeof step.pressure === 'number' ? step.pressure : 0, flow: null };
+}
+
+/**
+ * The shape a profile intends to draw, before any coffee is involved.
+ *
+ * This is the profile's own plan — what the machine is told to do — not a
+ * recording of what happened. It is what makes a list of profile names
+ * legible: "Adaptive v3" says nothing, a nine-bar block followed by a decline
+ * says everything.
+ *
+ * A `fast` transition jumps to the step's target at the step's start; a
+ * `smooth` one ramps to it from wherever the previous step left off, which is
+ * exactly how the machine reads them.
+ */
+export function profilePlan(profile: Profile): { points: PlanPoint[]; totalS: number } {
+  const points: PlanPoint[] = [];
+  let t = 0;
+  let lastPressure = 0;
+  let lastFlow = 0;
+
+  for (const step of profile.steps ?? []) {
+    const seconds = typeof step.seconds === 'number' && step.seconds > 0 ? step.seconds : 0;
+    const target = stepTarget(step);
+
+    const entryPressure = step.transition === 'smooth' ? lastPressure : target.pressure ?? lastPressure;
+    const entryFlow = step.transition === 'smooth' ? lastFlow : target.flow ?? lastFlow;
+
+    points.push({ t, pressure: entryPressure, flow: entryFlow });
+
+    lastPressure = target.pressure ?? lastPressure;
+    lastFlow = target.flow ?? lastFlow;
+    t += seconds;
+    points.push({ t, pressure: lastPressure, flow: lastFlow });
+  }
+
+  return { points, totalS: t };
+}
+
+/** A one-line description of the plan, for a row that has no room for a chart. */
+export function describePlan(profile: Profile): string {
+  const steps = profile.steps ?? [];
+  if (steps.length === 0) return 'no steps';
+
+  const modes = new Set(steps.map((step) => step.pump));
+  const shape = modes.size > 1 ? 'pressure and flow' : modes.has('flow') ? 'flow' : 'pressure';
+  const { totalS } = profilePlan(profile);
+  const seconds = totalS > 0 ? `${Math.round(totalS)}s` : 'open-ended';
+  return `${steps.length} steps · ${shape} · ${seconds}`;
+}

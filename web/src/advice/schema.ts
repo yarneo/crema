@@ -114,6 +114,10 @@ export const ADVICE_SCHEMA_TEXT = `{
  */
 export const ADVICE_RULES = [
   'Change ONE thing unless the shot is badly off. Everything you fill in is applied together by one button, so only include what you mean.',
+  // Ported from the Tcl skin, which said all of this and the web port did not.
+  'PROFILE: when the SHAPE of the curve is the problem, or the roast wants it, switch to a profile that fits or design one. Be proactive — a good profile fixes what grind alone cannot. Light roasts often want a gentle bloom and more heat; dark roasts often want lower pressure or a declining profile.',
+  'Any profile you create must obey the DE1: pressure 0-10 bar, flow 0-8 mL/s, temperature 80-98C, 2-6 steps. 96C is already hot at the puck and 97-98C is the ceiling.',
+  'IF THE SHOT IS ALREADY GOOD — rated 4-5/5 with positive taste words — the expert move is to LOCK IT IN, not tinker. Keep the profile, grind delta 0 with target at the current setting, dose/yield/temp null, and say so. Changing a dialled-in shot is how you lose it; a 5/5 does not need a change to be actionable.',
   'Put every field you deliberately leave alone at its current value or null - do not restate it as a change.',
   'Use evidence to point at the part of the curve your diagnosis is about. Give at most 3 windows, inside the shot duration. Omit it entirely rather than guessing.',
   'Respond with ONLY a valid JSON object in exactly the schema given, no prose and no markdown fences.',

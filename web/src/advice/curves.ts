@@ -62,6 +62,9 @@ export interface ShotCurves {
   /** What the profile intended. Absent on shots captured before we stored it. */
   pressureGoal?: readonly number[] | null;
   flowGoal?: readonly number[] | null;
+  /** Display-only curves. They are intentionally not sent to the advisor. */
+  weightG?: readonly number[] | null;
+  temperatureC?: readonly number[] | null;
 }
 
 /**

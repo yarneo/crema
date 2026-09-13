@@ -9,6 +9,8 @@
  * snapshot.
  */
 
+import { formatGrind } from './grind.ts';
+
 export interface Recipe {
   /** Title of the selected profile, or null when nothing is selected. */
   profileTitle: string | null;
@@ -87,11 +89,23 @@ export interface RecipeDiff {
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
 /** True when the two values differ by enough to be worth showing. */
+/**
+ * Slack for comparing a step against the threshold it is meant to clear.
+ *
+ * The steppers move by exactly one epsilon, and in binary that difference is
+ * not exactly one epsilon: 0.85 - 0.8 is 0.04999999999999993, just under the
+ * 0.05 threshold. Without this, every other tap was reported as "no change"
+ * and silently dropped, which trapped the grind between 0.75 and 0.80 — the
+ * only two values whose subtraction happens to round the other way. Far below
+ * any real dial's precision, so it cannot mask a genuine no-op.
+ */
+const FLOAT_SLACK = 1e-9;
+
 export function fieldChanged(field: RecipeField, from: Recipe[RecipeField], to: Recipe[RecipeField]): boolean {
   if (from === null || from === undefined) return to !== null && to !== undefined;
   if (to === null || to === undefined) return false; // proposing "no value" is not a change
   if (isNum(from) && isNum(to)) {
-    return Math.abs(to - from) >= (EPSILON[field] ?? 0);
+    return Math.abs(to - from) + FLOAT_SLACK >= (EPSILON[field] ?? 0);
   }
   return String(from).trim() !== String(to).trim();
 }
@@ -167,4 +181,47 @@ export function formatValue(field: RecipeField, value: number | string | null): 
   if (!isNum(value)) return String(value);
   const decimals = field === 'temperatureC' || field === 'grind' ? 1 : 1;
   return value.toFixed(decimals);
+}
+
+/**
+ * One line naming what a diff put on the machine.
+ *
+ * This has to agree with the advice card it summarises, which is why
+ * `starting` is a parameter rather than something inferred here. Before a
+ * first shot nothing is "held" — every value is part of the recipe just
+ * accepted, and none of them has a before. Listing only `changes` meant a
+ * setting that already matched the machine (dose 18, temperature 93) went
+ * unmentioned, so accepting a whole starting point reported "grind" alone
+ * while the card listed five settings.
+ */
+export function describeApplied(
+  diff: RecipeDiff,
+  profileSwitchTo: string | null,
+  starting: boolean
+): string {
+  const show = (change: FieldChange, side: 'from' | 'to'): string => {
+    const value = change[side];
+    return change.field === 'grind' && typeof value === 'number'
+      ? formatGrind(value)
+      : formatValue(change.field, value);
+  };
+
+  const fields = starting ? [...diff.changes, ...diff.held] : diff.changes;
+  const parts = fields
+    .filter((change) => change.field !== 'profileTitle')
+    .map((change) =>
+      starting
+        ? `${change.label.toLowerCase()} ${show(change, 'to')}`
+        : `${change.label.toLowerCase()} ${show(change, 'from')} › ${show(change, 'to')}`
+    );
+
+  if (profileSwitchTo) {
+    parts.unshift(starting ? `profile ${profileSwitchTo}` : `profile › ${profileSwitchTo}`);
+  } else if (starting) {
+    const held = diff.held.find((change) => change.field === 'profileTitle');
+    if (held && typeof held.to === 'string' && held.to) parts.unshift(`profile ${held.to}`);
+  }
+
+  if (parts.length > 0) return parts.join(' · ');
+  return starting ? 'The machine was already set this way.' : 'No numbers changed — pull it again the same way.';
 }

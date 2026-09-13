@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { describeFailedConnect } from '../gateway/devices.ts';
 import { Gateway, GatewayError, GatewayTimeoutError, resolveGatewayOrigin, toWebSocketOrigin } from '../gateway/client.ts';
 import {
   diffToWorkflowPatch,
@@ -187,6 +188,133 @@ test('a workflow read hits the documented path', async () => {
   assert.equal(seen, 'http://localhost:8080/api/v1/workflow');
 });
 
+test('machine info exposes whether physical GHC controls are fitted', async () => {
+  let seen = '';
+  const gateway = new Gateway({
+    origin: 'http://localhost:8080',
+    fetch: stubFetch((url) => {
+      seen = url;
+      return new Response(JSON.stringify({ model: 'DE1XL', GHC: true }), { status: 200 });
+    })
+  });
+
+  assert.equal((await gateway.readMachineInfo()).GHC, true);
+  assert.equal(seen, 'http://localhost:8080/api/v1/machine/info');
+});
+
+test('device controls use Decaids documented scan, connect, and tare routes', async () => {
+  const calls: Array<{ url: string; method: string; body?: string }> = [];
+  const gateway = new Gateway({
+    origin: 'http://localhost:8080',
+    fetch: stubFetch((url, init) => {
+      calls.push({ url, method: init?.method ?? 'GET', ...(typeof init?.body === 'string' ? { body: init.body } : {}) });
+      return new Response(url.includes('/tare') ? null : '[]', { status: url.includes('/tare') ? 204 : 200 });
+    })
+  });
+
+  await gateway.connectDevice('MockScale');
+  await gateway.tareScale();
+
+  assert.deepEqual(calls, [
+    { url: 'http://localhost:8080/api/v1/devices/connect', method: 'PUT', body: '{"deviceId":"MockScale"}' },
+    { url: 'http://localhost:8080/api/v1/scale/tare', method: 'PUT' }
+  ]);
+});
+
+// ---- connecting one device without disturbing the others ------------------
+
+/** Record every URL a connectKind call touches, given a fixed scan result. */
+async function connectCalls(
+  kind: 'machine' | 'scale',
+  scanResult: (url: string) => unknown[]
+): Promise<Array<{ url: string; body?: string }>> {
+  const calls: Array<{ url: string; body?: string }> = [];
+  const gateway = new Gateway({
+    origin: 'http://localhost:8080',
+    fetch: stubFetch((url, init) => {
+      calls.push({ url, ...(typeof init?.body === 'string' ? { body: init.body } : {}) });
+      const body = url.includes('/devices/connect') ? '{}' : JSON.stringify(scanResult(url));
+      return new Response(body, { status: 200 });
+    })
+  });
+  await gateway.connectKind(kind);
+  return calls;
+}
+
+const de1 = { name: 'DE1', id: 'm-1', state: 'disconnected', type: 'machine', available: true };
+const scale = { name: 'Decent Scale', id: 's-1', state: 'connected', type: 'scale', available: true };
+
+test('connecting never asks the gateway to connect everything it can see', async () => {
+  // `scan?connect=true` connects whatever it finds. Asking for the scale then
+  // churned Bluetooth for the machine too, and a DE1 mid-handshake drops.
+  const calls = await connectCalls('machine', () => [de1, scale]);
+  assert.ok(!calls.some((c) => c.url.includes('connect=true')), 'no shotgun scan');
+  assert.ok(calls.some((c) => c.url.includes('/devices/scan')), 'it still discovers');
+});
+
+test('only the device that was asked for is connected', async () => {
+  const calls = await connectCalls('machine', () => [de1, scale]);
+  const connects = calls.filter((c) => c.url.includes('/devices/connect'));
+  assert.equal(connects.length, 1);
+  assert.equal(connects[0]!.body, '{"deviceId":"m-1"}', 'the machine, by id');
+});
+
+test('a device already connected is left alone', async () => {
+  // The scale here is connected; nothing should be done to it.
+  const calls = await connectCalls('scale', () => [de1, scale]);
+  assert.equal(calls.filter((c) => c.url.includes('/devices/connect')).length, 0);
+});
+
+test('an unavailable device is not connected to', async () => {
+  const asleep = { ...de1, available: false };
+  const calls = await connectCalls('machine', () => [asleep]);
+  assert.equal(calls.filter((c) => c.url.includes('/devices/connect')).length, 0,
+    'connecting to hardware that is not advertising just errors');
+});
+
+test('an empty quick scan falls through to the full one', async () => {
+  const calls = await connectCalls('machine', (url) => (url.includes('quick=true') ? [] : [de1]));
+  assert.match(calls[0]!.url, /quick=true/);
+  assert.equal(calls[1]!.url, 'http://localhost:8080/api/v1/devices/scan');
+  assert.equal(calls[2]!.body, '{"deviceId":"m-1"}');
+});
+
+test('a quick scan that finds the device is the end of the scanning', async () => {
+  const calls = await connectCalls('machine', () => [de1]);
+  assert.equal(calls.filter((c) => c.url.includes('/devices/scan')).length, 1);
+});
+
+test('AI-authored profiles are created through the profile record endpoint', async () => {
+  let body = '';
+  const gateway = new Gateway({
+    origin: 'http://localhost:8080',
+    fetch: stubFetch((_url, init) => {
+      body = String(init?.body ?? '');
+      return new Response('{"id":"p1","profile":{"title":"AI · Kenya","steps":[]}}', { status: 201 });
+    })
+  });
+  const created = await gateway.createProfile({ title: 'AI · Kenya', steps: [] });
+  assert.equal(created.id, 'p1');
+  assert.deepEqual(JSON.parse(body), { profile: { title: 'AI · Kenya', steps: [] } });
+});
+
+test('bean corrections and deletion use the bean resource', async () => {
+  const calls: string[] = [];
+  const gateway = new Gateway({
+    origin: 'http://localhost:8080',
+    fetch: stubFetch((url, init) => {
+      calls.push(`${init?.method ?? 'GET'} ${url}`);
+      return new Response(init?.method === 'DELETE' ? '{}' : '{"id":"b1","roaster":"Moonwake","name":"Kenya"}');
+    })
+  });
+  await gateway.updateBean('b1', { name: 'Kenya' });
+  await gateway.deleteBean('b1');
+  assert.deepEqual(calls, [
+    'PUT http://localhost:8080/api/v1/beans/b1',
+    'DELETE http://localhost:8080/api/v1/beans/b1'
+  ]);
+});
+
 test('an update PUTs JSON and returns the machines answer', async () => {
   let body = '';
   let method = '';
@@ -244,4 +372,30 @@ test('an unreachable gateway is a clear message, not a raw TypeError', async () 
     () => gateway.readWorkflow(),
     (error: unknown) => error instanceof GatewayError && /Could not reach the gateway/.test(error.message)
   );
+});
+
+// ---- explaining a connect that found nothing ------------------------------
+
+test('a paired-but-unreachable device is not reported as missing', () => {
+  // Measured on a real DE1 that was switched off: Decaid still lists it, with
+  // available:false. Saying "no machine found" would send someone looking for
+  // a pairing problem they do not have.
+  const devices = [
+    { name: 'Decent Scale', id: 'a', state: 'connected', type: 'scale', available: true },
+    { name: 'DE1', id: 'b', state: 'disconnected', type: 'machine', available: false }
+  ];
+
+  assert.match(describeFailedConnect('machine', devices), /DE1 is paired but not responding/);
+  assert.match(describeFailedConnect('machine', devices), /switch it on/);
+});
+
+test('a device the gateway has never seen reads as missing', () => {
+  assert.match(describeFailedConnect('machine', []), /No machine found/);
+  assert.match(describeFailedConnect('scale', []), /No scale found/);
+  assert.match(describeFailedConnect('scale', []), /Bluetooth range/);
+});
+
+test('a reachable device that still refuses is its own case', () => {
+  const devices = [{ name: 'DE1', id: 'b', state: 'disconnected', type: 'machine', available: true }];
+  assert.match(describeFailedConnect('machine', devices), /found but would not connect/);
 });

@@ -28,7 +28,12 @@ export interface CremaSettings extends ProviderConfig {
   grinderName: string;
   /** Optional, e.g. "0.1-0.5". Used to size moves, never to clamp them. */
   grinderRange: string;
+  /** Dark is the default, as in the Tcl skin; light is its `theme_variant`. */
+  theme: Theme;
 }
+
+export const THEMES = ['dark', 'light'] as const;
+export type Theme = (typeof THEMES)[number];
 
 export const DEFAULT_SETTINGS: CremaSettings = {
   provider: 'anthropic',
@@ -36,7 +41,8 @@ export const DEFAULT_SETTINGS: CremaSettings = {
   model: '',
   baseUrl: '',
   grinderName: '',
-  grinderRange: ''
+  grinderRange: '',
+  theme: 'dark'
 };
 
 function isProvider(value: unknown): value is ProviderId {
@@ -60,7 +66,8 @@ export function loadSettings(): CremaSettings {
       model: str('model'),
       baseUrl: str('baseUrl'),
       grinderName: str('grinderName'),
-      grinderRange: str('grinderRange')
+      grinderRange: str('grinderRange'),
+      theme: record['theme'] === 'light' ? 'light' : 'dark'
     };
   } catch {
     return { ...DEFAULT_SETTINGS };
@@ -79,6 +86,40 @@ export function saveSettings(settings: CremaSettings): boolean {
 
 /** Whether Crema has enough to ask for advice at all. */
 export function isReady(settings: CremaSettings): boolean {
-  if (settings.provider === 'compatible' || settings.provider === 'server') return true;
+  // The local server needs no key, but it does need an address — and it no
+  // longer has a default, because the old one (localhost) was right only on
+  // the Mac itself. Without this, a blank field reads as "ready" and every
+  // request fails.
+  if (settings.provider === 'server') return settings.baseUrl.trim() !== '';
+  if (settings.provider === 'compatible') return true;
   return settings.apiKey.trim() !== '';
+}
+
+/**
+ * Whether the machine has a group-head controller.
+ *
+ * Remembered separately from the settings above because it is not a
+ * preference — it is a fact about the hardware, discovered from the gateway.
+ * It is cached for one reason: the brew screen's whole layout depends on it
+ * (a GHC machine has no on-screen start buttons), and waiting for a round trip
+ * to find out means rendering the wrong layout first and correcting it, which
+ * reads as a flicker.
+ */
+const GHC_KEY = 'crema.machine.ghc.v1';
+
+export function loadKnownGhc(): boolean | null {
+  try {
+    const raw = localStorage.getItem(GHC_KEY);
+    return raw === 'true' ? true : raw === 'false' ? false : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveKnownGhc(hasGhc: boolean): void {
+  try {
+    localStorage.setItem(GHC_KEY, hasGhc ? 'true' : 'false');
+  } catch {
+    // Not knowing next time is survivable; it only costs one relayout.
+  }
 }
