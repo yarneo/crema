@@ -42,13 +42,29 @@ namespace eval ::crema::store {
 		# metal-sensor reading that runs much cooler and must NOT be read as brew temp
 		dict set rec brew_temp [ifexists ::settings(espresso_temperature) ""]
 
+		# The profile's STEP NAMES, in order. Stored so a shot's graph can be
+		# banded and labelled after the fact - "wet | bloom | rise | hold |
+		# decline" - which is what turns a curve from a squiggle into something
+		# you can read. Names only: the boundaries are recovered from the goal
+		# curves, which are already captured below, so this stays small.
+		set pnames {}
+		catch {
+			foreach step [ifexists ::settings(advanced_shot) {}] {
+				set nm ""
+				catch { set nm [dict get $step name] }
+				lappend pnames $nm
+			}
+		}
+		dict set rec profile_steps $pnames
+
 		# curves from the BLT vectors. pressure_goal/flow_goal are the profile's
 		# INTENDED curves - capturing them lets the advisor read intended-vs-actual
 		# (did the machine hit the profile?) instead of guessing the profile shape.
 		foreach {key vec} {elapsed espresso_elapsed pressure espresso_pressure \
 				flow espresso_flow weight_flow espresso_flow_weight \
 				pressure_goal espresso_pressure_goal flow_goal espresso_flow_goal \
-				basket_temp espresso_temperature_basket} {
+				basket_temp espresso_temperature_basket \
+				in_cup espresso_weight} {
 			set vals {}
 			catch { set vals [$vec range 0 end] }
 			dict set rec $key $vals
@@ -90,6 +106,29 @@ namespace eval ::crema::store {
 			return 0
 		}
 		return 1
+	}
+
+	# Merge a rating into a shot already on disk. A shot could only be rated in
+	# the moments after pulling it, so any shot you walked away from stayed
+	# unscored - and an unscored shot is invisible to the dial-in trail and
+	# teaches the advisor nothing.
+	proc rate {id answers} {
+		set rec [get $id]
+		if {![llength $rec]} { return 0 }
+		set before [llength [dict keys $rec]]
+		set merged [dict create]
+		catch { set merged [dict get $rec answers] }
+		foreach {k v} $answers {
+			if {$v eq "" || $v eq "null"} { continue }
+			dict set merged $k $v
+		}
+		dict set rec answers $merged
+		# never write back a record that lost fields - the file holds the curves
+		if {[llength [dict keys $rec]] < $before} {
+			msg -ERROR "crema-store: refusing to rate $id, record shrank"
+			return 0
+		}
+		return [save $rec]
 	}
 
 	proc load_one {fn} {

@@ -7,3 +7,7 @@ server/data/
 
 # build output — ship releases via GitHub Releases, not the repo
 dist/
+
+# The Decaid port now lives in this tree alongside the Tcl skin, so it is no
+# longer ignored. Its own web/.gitignore keeps node_modules, dist and the
+# release zip out — the hazard the old rule existed for.

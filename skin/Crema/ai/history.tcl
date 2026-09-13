@@ -77,6 +77,46 @@ namespace eval ::crema::history {
 		after 0 [list {*}$cb $out]
 	}
 
+	# rate {id answers cb}: score a shot that is already in history.
+	# cb called as {cb 1|0}.
+	proc rate {id answers cb} {
+		if {[standalone]} {
+			set ok 0
+			catch { set ok [::crema::store::rate $id $answers] }
+			after 0 [list {*}$cb $ok]
+			return
+		}
+		# answers is a flat dict of scores/labels; build the object by hand with
+		# the advisor's own escaper rather than pulling in a serializer
+		set parts {}
+		foreach {k v} $answers {
+			if {$v eq ""} { continue }
+			if {[string is integer -strict $v]} {
+				lappend parts "[::crema::llm::jstr $k]:$v"
+			} else {
+				lappend parts "[::crema::llm::jstr $k]:[::crema::llm::jstr $v]"
+			}
+		}
+		if {![llength $parts]} { after 0 [list {*}$cb 0] ; return }
+		set body "{\"answers\":{[join $parts ,]}}"
+		if {[catch {
+			::http::geturl "$::crema_settings(server_url)/shot/$id/rating" \
+				-timeout 8000 -type "application/json" \
+				-query [encoding convertto utf-8 $body] \
+				-command [list ::crema::history::_rate_http $cb]
+		}]} { after 0 [list {*}$cb 0] }
+	}
+
+	proc _rate_http {cb tok} {
+		set ok 0
+		catch {
+			set code [::http::ncode $tok]
+			if {$code >= 200 && $code < 300} { set ok 1 }
+		}
+		catch { ::http::cleanup $tok }
+		after 0 [list {*}$cb $ok]
+	}
+
 	# store record -> normalized shot shape (record IS the payload)
 	proc _wrap {rec} {
 		# require the two identifying fields; a partial write missing them is

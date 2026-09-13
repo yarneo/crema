@@ -163,7 +163,7 @@ namespace eval ::crema::pages::crema_qa {
 		catch { ::crema::pages::crema_home::refresh_pending }
 		# acknowledge the save on-screen, then drop home after a beat
 		set page [namespace tail [namespace current]]
-		catch { dui item config $page qa_saved_msg -text "✓ Shot saved to history" -fill "#57A85A" }
+		catch { dui item config $page qa_saved_msg -text "✓ Shot saved to history" -fill [::theme success] }
 		after 900 { catch { ::crema::pages::crema_qa::_finish_save } }
 	}
 	proc _finish_save {} {
@@ -186,15 +186,15 @@ namespace eval ::crema::pages::crema_qa {
 	}
 
 	proc row {page y title group options} {
-		dui add dtext $page 160 [expr {$y + 42}] -text [string toupper $title] \
+		dui add dtext $page 120 [expr {$y + 42}] -text [string toupper $title] \
 			-font_family "Mazzard Medium" -font_size 15 -fill [::theme muted] \
 			-anchor w -tags lbl_$group
 		set n [llength $options]
 		set x 640
 		foreach {value label} $options {
-			set w [expr {$n >= 5 ? 300 : ($n == 4 ? 380 : 480)}]
+			set w [expr {$n >= 5 ? 336 : ($n == 4 ? 427 : 580)}]
 			dui add dbutton $page $x $y [expr {$x + $w}] [expr {$y + 108}] \
-				-tags opt_${group}_${value} -shape round -radius 22 \
+				-tags opt_${group}_${value} -shape round -radius 50 \
 				-fill [::theme button] -label $label -label_pos {0.5 0.5} \
 				-label_font_size 20 -label_fill [::theme button_text_dark] \
 				-command [list ::crema::pages::crema_qa::pick $group $value]
@@ -206,11 +206,11 @@ namespace eval ::crema::pages::crema_qa {
 		variable groups
 		set page [namespace tail [namespace current]]
 
-		dui add dtext $page 160 90 -text "How was that shot?" \
+		dui add dtext $page 120 90 -text "How was that shot?" \
 			-font_family "Mazzard SemiBold" -font_size 38 \
 			-fill [::theme background_text] -anchor w -tags qa_title
-		dui add dtext $page 160 165 -text "" -tags qa_summary \
-			-font_size 17 -fill [::theme muted] -anchor w
+		dui add dtext $page 120 165 -text "" -tags qa_summary \
+			-font_size 19 -fill [::theme muted] -anchor w
 
 		# confirm the grind you actually used (the AI reasons from this)
 		dui add dtext $page 1620 108 -text "GRIND USED" -font_family "Mazzard Medium" \
@@ -241,18 +241,18 @@ namespace eval ::crema::pages::crema_qa {
 		# dropped the old "Rate later": leaving this page via the nav bar already
 		# keeps the shot pending, and home surfaces it as a "Rate your shot" chip.
 		# "Skip" was renamed "Discard" because users read Skip as "keep the shot".
-		dui add dbutton $page 160 1300 680 1420 -tags qa_skip -shape outline \
-			-outline [::theme card_outline] -arc_offset 32 -label "Discard" \
+		dui add dbutton $page 120 1300 680 1420 -tags qa_skip -shape outline \
+			-outline [::theme card_outline] -arc_offset 20 -label "Discard" \
 			-label_pos {0.5 0.5} -label_font_size 20 -label_fill [::theme muted] \
 			-command ::crema::pages::crema_qa::skip
 
 		# save the rating to history WITHOUT calling the AI (no wait, no LLM cost)
 		dui add dbutton $page 1020 1300 1540 1420 -tags qa_saveonly -shape outline \
-			-outline [::theme card_outline] -arc_offset 32 -label "Save only" \
+			-outline [::theme card_outline] -arc_offset 20 -label "Save only" \
 			-label_pos {0.5 0.5} -label_font_size 20 -label_fill [::theme background_text] \
 			-command ::crema::pages::crema_qa::save_only
 
-		dui add dbutton $page 1880 1300 2400 1420 -tags qa_submit -shape round -radius 32 \
+		dui add dbutton $page 1880 1300 2400 1420 -tags qa_submit -shape round -radius 20 \
 			-fill [::theme accent] -label "Get advice" -label_pos {0.5 0.5} \
 			-label_font_family "Mazzard SemiBold" -label_font_size 22 \
 			-label_fill [::theme accent_text] \
@@ -260,7 +260,7 @@ namespace eval ::crema::pages::crema_qa {
 
 		# brief confirmation shown after "Save only" before we drop back home
 		dui add dtext $page 1280 1240 -text "" -tags qa_saved_msg -font_size 24 \
-			-fill "#57A85A" -anchor center -justify center
+			-fill [::theme success] -anchor center -justify center
 
 		::crema::pages::add_nav $page {}
 	}
@@ -311,9 +311,9 @@ namespace eval ::crema::pages::crema_advice {
 
 		# verdict hero + kicker
 		dui add dtext $page 120 330 -text "" -tags adv_grind_hero \
-			-font_family "Mazzard Light" -font_size 92 -fill [::theme accent] \
+			-font_family "Mazzard Light" -font_size 96 -fill [::theme accent] \
 			-anchor w
-		dui add dtext $page 124 490 -text "" -tags adv_grind_sub \
+		dui add dtext $page 120 490 -text "" -tags adv_grind_sub \
 			-font_family "Mazzard Medium" -font_size 15 -fill [::theme muted] -anchor w
 
 		dui add dtext $page 120 530 -text "" -tags adv_summary \
@@ -344,14 +344,28 @@ namespace eval ::crema::pages::crema_advice {
 		dui add dtext $page 280 1010 -text "" -tags adv_why -font_size 16 \
 			-fill [::theme button_text_dark] -anchor nw -justify left -width 2120
 
-		dui add dbutton $page 120 1300 640 1440 -tags adv_apply_all -shape round -radius 32 \
+		dui add dbutton $page 120 1300 640 1440 -tags adv_apply_all -shape round -radius 20 \
 			-initial_state hidden -fill [::theme accent] -label "Got it" -label_pos {0.5 0.5} \
 			-label_font_family "Mazzard SemiBold" -label_font_size 24 \
 			-label_fill [::theme accent_text] \
 			-command ::crema::pages::crema_advice::primary_press
 
+		# Undo sits beside Apply and appears only once Apply has run. It shares no
+		# slot with adv_fixsetup, which only exists in the error state.
+		# Same outline treatment as adv_fixsetup: this page's established
+		# secondary-button style, so Undo cannot be mistaken for the primary
+		# action. (An earlier draft used `[::theme card]`, which is not a theme
+		# key — ::theme returns empty for an unknown one rather than erroring,
+		# so it would have rendered an unfilled button and looked like a bug.)
+		dui add dbutton $page 680 1300 1200 1440 -tags adv_undo -shape outline \
+			-initial_state hidden -outline [::theme card_outline] -arc_offset 20 \
+			-label "Undo" -label_pos {0.5 0.5} \
+			-label_font_family "Mazzard SemiBold" -label_font_size 24 \
+			-label_fill [::theme background_text] \
+			-command ::crema::pages::crema_advice::undo_press
+
 		# shown only in the error state (same slot as Apply, never both at once)
-		dui add dbutton $page 120 1300 640 1440 -tags adv_retry -shape round -radius 32 \
+		dui add dbutton $page 120 1300 640 1440 -tags adv_retry -shape round -radius 20 \
 			-initial_state hidden -fill [::theme accent] -label "Try again" -label_pos {0.5 0.5} \
 			-label_font_family "Mazzard SemiBold" -label_font_size 24 \
 			-label_fill [::theme accent_text] \
@@ -361,21 +375,21 @@ namespace eval ::crema::pages::crema_advice {
 		# or unreachable server is the usual cause, and hunting through Settings for
 		# it is a two-hop maze
 		dui add dbutton $page 680 1300 1200 1440 -tags adv_fixsetup -shape outline \
-			-initial_state hidden -outline [::theme card_outline] -arc_offset 32 \
+			-initial_state hidden -outline [::theme card_outline] -arc_offset 20 \
 			-label "Fix AI setup" -label_pos {0.5 0.5} \
 			-label_font_family "Mazzard SemiBold" -label_font_size 24 \
 			-label_fill [::theme background_text] \
 			-command ::crema::pages::crema_advice::open_setup
 
 		# shown only for a bean with NO shots yet: ask the AI for a starting point
-		dui add dbutton $page 120 1300 760 1440 -tags adv_starter -shape round -radius 32 \
+		dui add dbutton $page 120 1300 760 1440 -tags adv_starter -shape round -radius 20 \
 			-initial_state hidden -fill [::theme accent] -label "Get a starting point" \
 			-label_pos {0.5 0.5} -label_font_family "Mazzard SemiBold" -label_font_size 24 \
 			-label_fill [::theme accent_text] \
 			-command ::crema::advisor::request_starter
 
 		dui add dbutton $page 1980 1300 2400 1440 -tags adv_done -shape outline \
-			-outline [::theme card_outline] -arc_offset 32 -label "Done" \
+			-outline [::theme card_outline] -arc_offset 20 -label "Done" \
 			-label_pos {0.5 0.5} -label_font_family "Mazzard SemiBold" \
 			-label_font_size 24 -label_fill [::theme background_text] \
 			-command ::crema::pages::crema_advice::done
@@ -434,6 +448,7 @@ namespace eval ::crema::pages::crema_advice {
 		set status $::crema::advisor::status
 
 		setvis $page adv_apply_all 0
+		catch { setvis $page adv_undo 0 }
 		setvis $page adv_retry 0
 		setvis $page adv_fixsetup 0
 		setvis $page adv_starter 0
@@ -492,27 +507,27 @@ namespace eval ::crema::pages::crema_advice {
 			# verdict hero
 			if {$grind_changes} {
 				set word [expr {$target < $cur ? "finer" : "coarser"}]
-				dui item config $page adv_grind_hero -text "$word  $target"
+				dui item config $page adv_grind_hero -text "$word $target"
 				dui item config $page adv_grind_sub -text "GRIND · $cur › $target · [::crema::grinder_label]"
 			} elseif {[set ${a}(created_profile)] ne ""} {
 				dui item config $page adv_grind_hero -text "new profile"
-				dui item config $page adv_grind_sub -text "GRIND · NO CHANGE YET"
+				dui item config $page adv_grind_sub -text "GRIND · $cur unchanged · [::crema::grinder_label]"
 			} elseif {[set ${a}(profile_action)] eq "switch" && [set ${a}(profile_switch_to)] ni {"" null}} {
 				dui item config $page adv_grind_hero -text "switch profile"
-				dui item config $page adv_grind_sub -text "GRIND · NO CHANGE YET"
+				dui item config $page adv_grind_sub -text "GRIND · $cur unchanged · [::crema::grinder_label]"
 			} elseif {$has_temp} {
 				set word [expr {$temp > $::settings(espresso_temperature) ? "hotter" : "cooler"}]
-				dui item config $page adv_grind_hero -text "$word  ${temp}C"
-				dui item config $page adv_grind_sub -text "GRIND · NO CHANGE YET"
+				dui item config $page adv_grind_hero -text "$word ${temp}C"
+				dui item config $page adv_grind_sub -text "GRIND · $cur unchanged · [::crema::grinder_label]"
 			} elseif {$has_yield} {
-				dui item config $page adv_grind_hero -text "yield  ${yield}g"
-				dui item config $page adv_grind_sub -text "GRIND · NO CHANGE YET"
+				dui item config $page adv_grind_hero -text "yield ${yield}g"
+				dui item config $page adv_grind_sub -text "GRIND · $cur unchanged · [::crema::grinder_label]"
 			} elseif {$has_dose} {
-				dui item config $page adv_grind_hero -text "dose  ${dose}g"
-				dui item config $page adv_grind_sub -text "GRIND · NO CHANGE YET"
+				dui item config $page adv_grind_hero -text "dose ${dose}g"
+				dui item config $page adv_grind_sub -text "GRIND · $cur unchanged · [::crema::grinder_label]"
 			} else {
-				dui item config $page adv_grind_hero -text "keep  $cur"
-				dui item config $page adv_grind_sub -text "GRIND · NO CHANGE YET"
+				dui item config $page adv_grind_hero -text "keep $cur"
+				dui item config $page adv_grind_sub -text "GRIND · $cur unchanged · [::crema::grinder_label]"
 			}
 
 			# action chips
@@ -548,11 +563,11 @@ namespace eval ::crema::pages::crema_advice {
 			if {$grind_changes || $has_temp || $has_dose || $has_yield || $has_profile} {
 				set primary_mode "apply"
 				setlabel $page adv_apply_all "Apply"
+				setvis $page adv_apply_all 1
 			} else {
 				set primary_mode "done"
-				setlabel $page adv_apply_all "Got it"
+				setvis $page adv_apply_all 0
 			}
-			setvis $page adv_apply_all 1
 		}
 	}
 
@@ -565,7 +580,28 @@ namespace eval ::crema::pages::crema_advice {
 		}
 	}
 
+	# Put the machine back where it was before Apply. One-shot: the button hides
+	# itself again so a second press cannot re-apply a stale snapshot over
+	# something changed by hand since.
+	proc undo_press {} {
+		set page [namespace tail [namespace current]]
+		if {[catch { ::crema::advisor::undo_last_apply } ok]} {
+			msg -ERROR "crema: undo failed: $ok"
+			catch { dui item config $page adv_status -text "Undo failed - see the log" }
+			return
+		}
+		catch { setvis $page adv_undo 0 }
+		variable primary_mode
+		set primary_mode "apply"
+		catch { setlabel $page adv_apply_all "Apply" }
+		catch { dui item config $page adv_status \
+			-text [expr {$ok ? {Undone - back to your previous settings} : {Nothing to undo}}] }
+	}
+
 	proc apply_all {} {
+		# Before anything moves: Apply can change grind, dose, yield, every
+		# step's temperature and the profile in one press.
+		catch { ::crema::advisor::capture_undo }
 		set a ::crema::advisor::advice
 		# capture the grind delta BEFORE anything (a profile switch could move
 		# grinder_setting) so the status line is right
@@ -596,6 +632,7 @@ namespace eval ::crema::pages::crema_advice {
 		variable primary_mode
 		set primary_mode "done"
 		setlabel $page adv_apply_all "Applied"
+		catch { setvis $page adv_undo 1 }
 		# snapshot the applied dial-in onto this bean so a starting point (which has
 		# no shot to restore from) survives switching beans and coming back
 		catch { ::crema::advisor::persist_bean_dialin }
@@ -912,12 +949,20 @@ namespace eval ::crema::pages::crema_beans {
 			-text "GRIND · [::crema::grinder_label]" }
 	}
 
+	# A field, not a form box. The entry itself was already borderless; what read
+	# as a form was the 1px highlight rectangle around it. A rounded card behind
+	# it, added first so the entry draws on top, makes it match the bean cards
+	# and the grind card either side of it.
 	proc entry_row {page x y width label var} {
+		# The label, the field's box and the column all start at $x; the text
+		# inside is padded. Previously the box hung 18px to the LEFT of its own
+		# label, so no two things in a column of fields shared an edge.
 		dui add dtext $page $x [expr {$y - 46}] -text [string toupper $label] \
 			-font_family "Mazzard Medium" -font_size 13 -fill [::theme muted] -anchor w
-		dui add entry $page $x $y -canvas_width $width -font_size 22 \
-			-textvariable $var -borderwidth 0 -relief flat -highlightthickness 1 \
-			-highlightcolor [::theme accent] -highlightbackground [::theme card_outline] \
+		dui add shape round $page $x [expr {$y - 12}] \
+			-bwidth $width -bheight 70 -radius 20 -fill [::theme card_fill]
+		dui add entry $page [expr {$x + 22}] $y -canvas_width [expr {$width - 44}] -font_size 22 \
+			-textvariable $var -borderwidth 0 -relief flat -highlightthickness 0 \
 			-bg [::theme card_fill] -foreground [::theme background_text] \
 			-insertbackground [::theme accent]
 	}
@@ -927,14 +972,14 @@ namespace eval ::crema::pages::crema_beans {
 		set page [namespace tail [namespace current]]
 
 		dui add dtext $page 120 100 -text "Beans & grind" \
-			-font_family "Mazzard SemiBold" -font_size 34 \
+			-font_family "Mazzard SemiBold" -font_size 38 \
 			-fill [::theme background_text] -anchor w
 
 		# bean library cards
 		for {set i 0} {$i < $max_cards} {incr i} {
 			set y [expr {230 + $i * 195}]
 			dui add shape round $page 120 $y -bwidth 740 -bheight 170 \
-				-fill [::theme button] -radius 22 -tags [list bcard_$i btap_$i]
+				-fill [::theme card_fill] -radius 20 -tags [list bcard_$i btap_$i]
 			dui add shape round $page 132 [expr {$y + 25}] -bwidth 9 -bheight 120 \
 				-radius 4 -fill [::theme accent] -tags [list bsel_$i btap_$i] -initial_state hidden
 			dui add dtext $page 175 [expr {$y + 28}] -text "" -tags [list bname_$i btap_$i] \
@@ -962,7 +1007,6 @@ namespace eval ::crema::pages::crema_beans {
 		dui add dtext $page 120 1150 -text "" -tags beans_cap_msg \
 			-font_family "Mazzard Medium" -font_size 16 -fill [::theme muted] -anchor w -width 740
 
-		entry_row $page 120 1250 700 "Advisor URL" {::crema_settings(server_url)}
 
 		# selected bean fields
 		entry_row $page 990 320 760 "Roaster" {::settings(bean_brand)}
@@ -978,7 +1022,7 @@ namespace eval ::crema::pages::crema_beans {
 		set lx 990
 		foreach {lv label} {light "Light" medium "Medium" dark "Dark"} {
 			dui add dbutton $page $lx 1230 [expr {$lx + 236}] 1320 -tags rl_$lv \
-				-shape round -radius 22 -fill [::theme button] -label $label \
+				-shape round -radius 50 -fill [::theme button] -label $label \
 				-label_pos {0.5 0.5} -label_font_size 19 -label_fill [::theme background_text] \
 				-command [list ::crema::pages::crema_beans::pick_level $lv]
 			set lx [expr {$lx + 262}]
@@ -986,9 +1030,9 @@ namespace eval ::crema::pages::crema_beans {
 
 		# grind card
 		dui add shape round $page 1880 260 -bwidth 560 -bheight 560 \
-			-fill [::theme card_fill] -radius 28
+			-fill [::theme card_fill] -radius 24
 		dui add shape outline $page 1880 260 -bwidth 560 -bheight 560 \
-			-outline [::theme card_outline] -width 2 -arc_offset 28
+			-outline [::theme card_outline] -width 2 -arc_offset 24
 		dui add dtext $page 2160 330 -text "GRIND" -tags beans_grind_eyebrow \
 			-font_family "Mazzard Medium" -font_size 14 -fill [::theme muted] \
 			-anchor center -justify center
@@ -997,24 +1041,24 @@ namespace eval ::crema::pages::crema_beans {
 			-anchor center -justify center
 		dui add dtext $page 2160 630 -text "finer  <        >  coarser" -font_size 14 \
 			-fill [::theme muted] -anchor center -justify center
-		dui add dbutton $page 1930 690 2140 790 -tags grind_minus -shape round -radius 22 \
+		dui add dbutton $page 1930 690 2140 790 -tags grind_minus -shape round -radius 20 \
 			-fill [::theme button] -label "-0.05" -label_pos {0.5 0.5} \
 			-label_font_size 22 -label_fill [::theme background_text] \
 			-command [list ::crema::pages::crema_beans::bump_grind -0.05]
-		dui add dbutton $page 2180 690 2390 790 -tags grind_plus -shape round -radius 22 \
+		dui add dbutton $page 2180 690 2390 790 -tags grind_plus -shape round -radius 20 \
 			-fill [::theme button] -label "+0.05" -label_pos {0.5 0.5} \
 			-label_font_size 22 -label_fill [::theme background_text] \
 			-command [list ::crema::pages::crema_beans::bump_grind 0.05]
 
 		# explicit Save (edits also autosave on tab-away, but this is the
 		# discoverable affordance - device bug #3)
-		dui add dbutton $page 1880 900 2440 1030 -tags beans_save -shape round -radius 28 \
+		dui add dbutton $page 1880 1190 2440 1320 -tags beans_save -shape round -radius 24 \
 			-fill [::theme accent] -label "Save" -label_pos {0.5 0.5} \
 			-label_font_family "Mazzard SemiBold" -label_font_size 22 \
 			-label_fill [::theme accent_text] \
 			-command ::crema::pages::crema_beans::save_and_confirm
 
-		dui add dtext $page 2160 1070 -text "" -tags beans_saved_msg -font_size 15 \
+		dui add dtext $page 2160 1370 -text "" -tags beans_saved_msg -font_size 15 \
 			-fill [::theme primary_dark] -anchor center -justify center
 
 		::crema::pages::add_nav $page beans ::crema::pages::crema_beans::save
@@ -1105,7 +1149,7 @@ namespace eval ::crema::pages::crema_reconsider {
 			set cx [expr {120 + $col * 740}]
 			set cy [expr {480 + $row * 130}]
 			dui add dbutton $page $cx $cy [expr {$cx + 700}] [expr {$cy + 110}] \
-				-tags rc_chip_$key -shape round -radius 22 -fill [::theme button] \
+				-tags rc_chip_$key -shape round -radius 20 -fill [::theme button] \
 				-label $short -label_pos {0.5 0.5} -label_font_size 19 \
 				-label_fill [::theme background_text] \
 				-command [list ::crema::pages::crema_reconsider::toggle $key]
@@ -1121,7 +1165,7 @@ namespace eval ::crema::pages::crema_reconsider {
 			-highlightbackground [::theme card_outline] -bg [::theme card_fill] \
 			-foreground [::theme background_text] -insertbackground [::theme accent]
 
-		dui add dbutton $page 120 990 820 1120 -tags rc_go -shape round -radius 28 \
+		dui add dbutton $page 120 990 820 1120 -tags rc_go -shape round -radius 24 \
 			-fill [::theme accent] -label "Reconsider" -label_pos {0.5 0.5} \
 			-label_font_family "Mazzard SemiBold" -label_font_size 24 \
 			-label_fill [::theme accent_text] \

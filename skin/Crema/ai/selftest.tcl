@@ -66,10 +66,7 @@ namespace eval ::crema::selftest {
 		set status $::crema::advisor::status
 		if {$status eq "done"} {
 			log "PASS: advice = $::crema::advisor::advice(summary)"
-			log "checking dashboard (via home, like a real user)"
-			catch { ::crema::pages::crema_advice::done }
-			after 2000 { catch { dui page load crema_dashboard } }
-			after 8000 ::crema::selftest::check_dashboard
+			after 1000 ::crema::selftest::check_undo
 			return
 		}
 		if {$status eq "error"} {
@@ -80,6 +77,89 @@ namespace eval ::crema::selftest {
 			return
 		}
 		after 3000 ::crema::selftest::watch_advice
+	}
+
+	# The fields Apply can move and Undo must put back. Kept as a flat list so
+	# a mismatch names the field rather than dumping two opaque blobs.
+	proc machine_state {} {
+		set out [dict create]
+		dict set out profile [ifexists ::settings(profile_title) ""]
+		foreach k {grinder_setting grinder_dose_weight final_desired_shot_weight
+		           final_desired_shot_weight_advanced espresso_temperature} {
+			dict set out $k [ifexists ::settings($k) ""]
+		}
+		catch { dict set out steps [ifexists ::settings(advanced_shot) ""] }
+		return $out
+	}
+
+	proc item_state {tag} {
+		set state "absent"
+		catch {
+			foreach id [.can find withtag $tag] { set state [.can itemcget $id -state] }
+		}
+		return $state
+	}
+
+	# Apply is the one action that writes to the machine, and Undo is the only
+	# way back. Both are exercised here so a regression cannot reach the tablet
+	# silently.
+	proc check_undo {} {
+		variable undo_before
+		set before [machine_state]
+		# Stored before anything is scheduled, so the delayed check below cannot
+		# read it half-set.
+		set undo_before $before
+		log "UNDO: before apply -> $before"
+
+		if {[catch { ::crema::pages::crema_advice::apply_all } err]} {
+			log "UNDOFAIL: apply_all raised: $err"
+			save_evidence
+			after 1000 ::crema::selftest::to_dashboard
+			return
+		}
+
+		set applied [machine_state]
+		log "UNDO: after apply  -> $applied"
+		if {$applied eq $before} {
+			log "UNDO: note - apply changed nothing, so this run only proves undo is harmless"
+		}
+		log "UNDO: undo button state = [item_state adv_undo]"
+
+		after 1500 {
+			if {[catch { ::crema::pages::crema_advice::undo_press } err]} {
+				::crema::selftest::log "UNDOFAIL: undo_press raised: $err"
+				::crema::selftest::save_evidence
+				after 1000 ::crema::selftest::to_dashboard
+				return
+			}
+
+			set after_undo [::crema::selftest::machine_state]
+			::crema::selftest::log "UNDO: after undo   -> $after_undo"
+
+			set before2 [::crema::selftest::restored_target]
+			set bad {}
+			foreach k [dict keys $before2] {
+				if {[dict get $after_undo $k] ne [dict get $before2 $k]} { lappend bad $k }
+			}
+			if {[llength $bad]} {
+				::crema::selftest::log "UNDOFAIL: not restored: [join $bad {, }]"
+			} elseif {[::crema::selftest::item_state adv_undo] ne "hidden"} {
+				::crema::selftest::log "UNDOFAIL: undo button still visible after undo"
+			} else {
+				::crema::selftest::log "UNDOPASS: every field restored and the button hid itself"
+			}
+			after 1000 ::crema::selftest::to_dashboard
+		}
+	}
+
+	variable undo_before {}
+	proc restored_target {} { variable undo_before; return $undo_before }
+
+	proc to_dashboard {} {
+		log "checking dashboard (via home, like a real user)"
+		catch { ::crema::pages::crema_advice::done }
+		after 2000 { catch { dui page load crema_dashboard } }
+		after 8000 ::crema::selftest::check_dashboard
 	}
 
 	proc check_dashboard {} {

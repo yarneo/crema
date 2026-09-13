@@ -70,6 +70,11 @@ proc ::crema::load_settings {} {
 			array set ::crema_settings [encoding convertfrom utf-8 [read_binary_file [::crema::legacy_settings_filename]]]
 		}
 	}
+	# theme_status is a "saved - restart to apply" nudge meant for the moments
+	# right after you press the button. It gets persisted with everything else,
+	# so it survived the very restart it was asking for and then sat on the
+	# settings page claiming a pending change that had already happened.
+	set ::crema_settings(theme_status) ""
 }
 
 proc ::crema::save_settings {} {
@@ -129,6 +134,21 @@ namespace eval ::crema::advisor {
 		set bean [string trim $::settings(bean_type)]
 		if {$bean eq ""} { set bean "shot" }
 		set pending_desc "$bean · $secs"
+		# the home chart's idle ghost is now stale
+		catch { ::crema::pages::crema_home::ghost_invalidate }
+		chime
+	}
+
+	# An audible mark at the end of a shot, the way Bestpresso does it. You are
+	# looking at the cup and the scale, not the tablet, so the moment the shot
+	# is captured and ready to rate is worth hearing.
+	#
+	# Off by setting crema_settings(shot_chime) to 0. Every call is caught:
+	# `borg` only exists on Android, and a missing beep must never be able to
+	# interfere with saving a shot.
+	proc chime {} {
+		if {[ifexists ::crema_settings(shot_chime) 1] == 0} { return }
+		catch { borg beep }
 	}
 
 	proc has_pending {} {
@@ -964,6 +984,94 @@ namespace eval ::crema::advisor {
 	}
 
 	# dose / yield / temperature in one tap
+	# ---- undo -------------------------------------------------------------
+	# Apply is otherwise a one-way door: it can move the grind, the dose, the
+	# yield, every step's temperature AND the selected profile in one press, and
+	# putting that back by hand at 6am is miserable.
+	#
+	# The snapshot is taken verbatim rather than re-derived. Temperature in
+	# particular is applied as a DELTA across every profile step, so recomputing
+	# the inverse would drift; storing the whole advanced_shot list and the
+	# temperature scalars restores exactly what was there.
+	variable undo_snapshot ""
+
+	# Settings restored as plain scalars. advanced_shot and the profile are
+	# handled separately because they need ordering care.
+	variable undo_keys {
+		grinder_setting grinder_dose_weight
+		final_desired_shot_weight final_desired_shot_weight_advanced
+		espresso_temperature espresso_temperature_0 espresso_temperature_1
+		espresso_temperature_2 espresso_temperature_3
+	}
+
+	proc snapshot_state {} {
+		variable undo_keys
+		set snap [dict create]
+		dict set snap profile_title [ifexists ::settings(profile_title) ""]
+		foreach k $undo_keys {
+			if {[info exists ::settings($k)]} { dict set snap $k $::settings($k) }
+		}
+		catch { dict set snap advanced_shot $::settings(advanced_shot) }
+		catch { dict set snap last_grind [ifexists ::crema_settings(last_grind) ""] }
+		return $snap
+	}
+
+	proc restore_state {snap} {
+		variable undo_keys
+		if {![llength $snap]} { return 0 }
+
+		# PROFILE FIRST, for the same reason apply_all applies it first:
+		# select_profile loads that profile's own yield/temperature/dose and
+		# would clobber the scalars restored below.
+		set title ""
+		catch { set title [dict get $snap profile_title] }
+		if {$title ne "" && $title ne [ifexists ::settings(profile_title) ""]} {
+			set fn [resolve_profile_file $title]
+			if {$fn eq ""} {
+				# Not fatal: the scalars and steps below still put the machine
+				# back where it was, which is most of what undo means.
+				msg -ERROR "crema: undo could not find profile '$title'; restoring settings only"
+			} elseif {[catch { select_profile $fn } err]} {
+				msg -ERROR "crema: undo failed to reselect '$title': $err"
+			}
+		}
+
+		foreach k $undo_keys {
+			if {[dict exists $snap $k]} { set ::settings($k) [dict get $snap $k] }
+		}
+		catch { if {[dict exists $snap advanced_shot]} { set ::settings(advanced_shot) [dict get $snap advanced_shot] } }
+		catch { if {[dict exists $snap last_grind]} { set ::crema_settings(last_grind) [dict get $snap last_grind] } }
+
+		catch { ::save_settings }
+		catch { ::crema::save_settings }
+		catch { send_de1_settings_soon }
+		return 1
+	}
+
+	# Called immediately before Apply changes anything.
+	proc capture_undo {} {
+		variable undo_snapshot
+		set undo_snapshot [snapshot_state]
+		msg -INFO "crema: undo point captured"
+	}
+
+	proc can_undo {} {
+		variable undo_snapshot
+		return [expr {[llength $undo_snapshot] > 0}]
+	}
+
+	# One-shot: the snapshot is cleared so a second press cannot re-apply stale
+	# state over something the user has since changed by hand.
+	proc undo_last_apply {} {
+		variable undo_snapshot
+		if {![llength $undo_snapshot]} { return 0 }
+		set snap $undo_snapshot
+		set undo_snapshot ""
+		set ok [restore_state $snap]
+		msg -INFO "crema: undo [expr {$ok ? {restored} : {found nothing to restore}}]"
+		return $ok
+	}
+
 	proc apply_recipe {} {
 		variable advice
 		if {$advice(dose_g) ne ""} {

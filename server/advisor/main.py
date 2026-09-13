@@ -78,6 +78,18 @@ def get_shot_full(shot_id: int):
     return {"shot": shot}
 
 
+@app.post("/shot/{shot_id}/rating")
+def rate_shot(shot_id: int, body: dict):
+    """Rate a shot after the fact, from the shot detail page."""
+    answers = body.get("answers") if isinstance(body.get("answers"), dict) else body
+    if not isinstance(answers, dict) or not answers:
+        raise HTTPException(400, "no answers given")
+    shot = store.set_answers(shot_id, answers)
+    if not shot:
+        raise HTTPException(404, "unknown shot")
+    return {"shot_id": shot_id, "answers": shot["payload"].get("answers")}
+
+
 @app.get("/shots")
 def list_shots(limit: int = 50):
     shots = store.recent_shots(limit=limit)

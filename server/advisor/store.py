@@ -59,6 +59,29 @@ def set_error(shot_id: int, error: str) -> None:
         )
 
 
+def set_answers(shot_id: int, answers: dict) -> dict | None:
+    """Merge a rating into a shot already in history.
+
+    Shots could only ever be rated in the moments right after pulling them, so
+    any shot you walked away from stayed unscored forever - and an unscored
+    shot teaches the advisor nothing. Merging (not replacing) keeps whatever
+    was answered at the time.
+    """
+    with _lock, _connect() as conn:
+        row = conn.execute("SELECT * FROM shots WHERE id = ?", (shot_id,)).fetchone()
+        if row is None:
+            return None
+        payload = json.loads(row["payload"])
+        merged = dict(payload.get("answers") or {})
+        merged.update({k: v for k, v in answers.items() if v not in ("", None)})
+        payload["answers"] = merged
+        conn.execute(
+            "UPDATE shots SET payload = ? WHERE id = ?",
+            (json.dumps(payload), shot_id),
+        )
+    return get_shot(shot_id)
+
+
 def get_shot(shot_id: int) -> dict | None:
     with _lock, _connect() as conn:
         row = conn.execute("SELECT * FROM shots WHERE id = ?", (shot_id,)).fetchone()
