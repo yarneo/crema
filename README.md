@@ -109,6 +109,31 @@ provider (see [Choosing a provider](#choosing-a-provider)).
 4. **Run the setup wizard.** On first launch Crema asks for two things — your grinder
    and your AI provider + key. That's it. Pull a shot.
 
+## What's new in v1.1.1
+
+Three faults that only showed up on a real machine, all in the Decaid skin.
+
+- **Profiles can be saved at all now.** Decaid requires four fields on a new
+  profile that Crema never set, so every AI-authored profile and every profile
+  built in the step editor failed with a bare "Invalid request". This means the
+  AI writing you a profile — the thing that most sets Crema apart — had never
+  once worked outside a test.
+- **Settings survive a reinstall.** They live in browser storage, which is
+  scoped to the port Decaid serves the skin from, so updating the skin quietly
+  took the grinder and the Mac-server address with it. The non-secret settings
+  are now kept in Decaid's own store as well, the way shots always were, and
+  refill anything blank on the next start. Your API key is still never written
+  there.
+- **Reconsider is no longer a dead button.** It always ran, but said so on a
+  different button and put the answer off-screen. It now reports on the button
+  you pressed and scrolls the reply to you.
+- **Dose, yield and temperature are editable**, not just displayed — so you can
+  tell Crema you pull 20 g instead of hoping it guesses.
+- A Mac server with no address says so in Settings instead of failing silently
+  three screens away.
+
+The classic tablet skin is unchanged in this release.
+
 ## What's new in v1.1.0
 
 **Crema for Decaid — first release worth installing.** It began as a port and is now
