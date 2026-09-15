@@ -209,10 +209,24 @@ export class Gateway {
   }
 
   createProfile(profile: ProfileWire): Promise<ProfileEntryWire> {
+    // Decaid rejects a profile that omits any of these, one field per attempt
+    // ("Invalid argument(s): Profile must have \"tank_temperature\""), and a
+    // profile Crema authored carries none of them: both the AI's profiles and
+    // the step editor's failed to save with a bare "Invalid request". They are
+    // filled here, at the wire, so no author of a profile can miss one.
+    //
+    // Zero is off in each case: no volumetric stop, no volume count start, and
+    // no tank target — which is what Decent's own shipped profiles use.
+    const complete: ProfileWire = { ...profile };
+    complete.version ??= '2';
+    complete.target_volume ??= 0;
+    complete.target_volume_count_start ??= 0;
+    complete.tank_temperature ??= 0;
+
     return this.request<ProfileEntryWire>('/api/v1/profiles', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ profile })
+      body: JSON.stringify({ profile: complete })
     });
   }
 

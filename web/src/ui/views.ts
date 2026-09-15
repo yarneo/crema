@@ -146,13 +146,13 @@ export function renderRecipe(recipe: Recipe): string {
   return `
     <div class="recipe">
       <div class="recipe-summary">
-        ${cell('Dose', escape(formatValue('doseG', recipe.doseG)))}
+        ${cell('Dose', escape(formatValue('doseG', recipe.doseG)), 'doseG', 0.1)}
         <span class="recipe-arrow">›</span>
-        ${cell('Yield', escape(formatValue('targetYieldG', recipe.targetYieldG)))}
+        ${cell('Yield', escape(formatValue('targetYieldG', recipe.targetYieldG)), 'targetYieldG', 0.5)}
         <span class="recipe-dot">·</span>
         ${cell('Profile', escape(recipe.profileTitle ?? '—'), undefined, undefined, 'open-profiles')}
         <span class="recipe-dot">·</span>
-        ${cell('Temp', escape(formatValue('temperatureC', recipe.temperatureC)))}
+        ${cell('Temp', escape(formatValue('temperatureC', recipe.temperatureC)), 'temperatureC', 0.5)}
         <span class="ratio">${escape(ratioOf(recipe))}</span>
       </div>
       <div class="grind-card">
@@ -1300,7 +1300,7 @@ export function renderShotDetail(detail: ShotDetailModel): string {
              <div class="why">${escape(detail.advice.diagnosis)}</div>
            </div></div>`
         : '<div class="drow"><span class="label k">Advice</span><div class="why">None was asked for.</div></div>'}
-      ${detail.error ? `<p class="why err">${escape(detail.error)}</p>` : ''}
+      ${detail.error && !(detail.rebuttalOpen && detail.id) ? `<p class="why err">${escape(detail.error)}</p>` : ''}
       ${detail.id ? `<div class="shot-actions">
         ${detail.advice
           ? `<button class="btn" data-action="toggle-stored-rebuttal" data-id="${escape(detail.id)}">${detail.rebuttalOpen ? 'Never mind' : 'I disagree'}</button>
@@ -1316,7 +1316,8 @@ export function renderShotDetail(detail: ShotDetailModel): string {
           `<button class="chip${detail.rebuttalReasons?.includes(option.key) ? ' on' : ''}" type="button" data-action="stored-reason" data-reason="${option.key}">${option.label}</button>`
         ).join('')}</div>
         <textarea name="storedRebuttal" rows="3" placeholder="e.g. it was not sour; the finish was dry" ${detail.busy ? 'disabled' : ''}>${escape(detail.rebuttalText ?? '')}</textarea>
-        <button class="btn primary" type="submit" ${detail.busy ? 'disabled' : ''}>Reconsider</button>
+        <button class="btn primary" type="submit" ${detail.busy ? 'disabled' : ''}>${detail.busy ? 'Rethinking…' : 'Reconsider'}</button>
+        ${detail.error ? `<p class="why err">${escape(detail.error)}</p>` : ''}
       </form>` : ''}
     </section>
     ${detail.chart ? renderShot(detail.chart) : '<section class="card"><p class="empty">This shot was recorded before curves were stored, so there is nothing to replay.</p></section>'}`;
@@ -1417,11 +1418,19 @@ export function renderSetup(model: SetupModel): string {
           model.provider === 'server'
             ? ' <b>Base URL must be the Mac\u2019s own address</b> — its Bonjour name (<code>http://your-mac.local:8877</code>) or LAN IP. <code>localhost</code> only works when the skin is running on that same Mac.'
             : ''
-        }</p><div class="setup-fields provider-fields">
+        }</p>${
+          model.provider === 'server' && model.baseUrl.trim() === ''
+            ? '<p class="why err">No address yet, so Crema cannot reach the server and AI advice stays switched off. Enter it below.</p>'
+            : ''
+        }<div class="setup-fields provider-fields">
           <label><span class="label">Provider</span><select name="provider" data-action="change-provider">${options}</select></label>
           <label><span class="label">API key${keyless ? ' (often not needed)' : ''}</span><span class="key-field"><input name="apiKey" type="${model.keyVisible ? 'text' : 'password'}" autocomplete="off" placeholder="${keyless ? 'leave blank if none' : 'paste your key'}" value="${escape(model.apiKey)}" /><button class="key-toggle" type="button" data-action="toggle-api-key" aria-label="${model.keyVisible ? 'Hide API key' : 'Show API key'}">${model.keyVisible ? 'Hide' : 'Show'}</button></span></label>
           ${renderModelField(model)}
-          <label><span class="label">Base URL</span><input name="baseUrl" placeholder="blank uses the provider default" value="${escape(model.baseUrl)}" /></label>
+          <label><span class="label">Base URL${
+            model.provider === 'server' && model.baseUrl.trim() === '' ? ' <b class="needed">— required</b>' : ''
+          }</span><input name="baseUrl" placeholder="${
+            model.provider === 'server' ? 'http://your-mac.local:8877' : 'blank uses the provider default'
+          }" value="${escape(model.baseUrl)}" /></label>
         </div></section>
         <!--
           No Save button. These settings live in this device's browser storage,

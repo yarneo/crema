@@ -25,6 +25,11 @@
  const q = new URLSearchParams(location.search);
  const src = q.get('src') || '/?empty=1';
  const w = +(q.get('w')||1194), h = +(q.get('h')||834), inset = +(q.get('inset')||21);
+ // `bare=1` drops the rig's own chrome so a headless screenshot of this page is
+ // exactly the skin at w×h; `tab=Shots` lands on a tab, since the skin has no
+ // URL routing to deep-link with.
+ const bare = q.get('bare') === '1', tab = q.get('tab');
+ if (bare) document.write('<style>body{padding:0;gap:0;background:#000}figcaption{display:none}.dev{border-radius:0}.safe{display:none}</style>');
  const host = document.getElementById('host');
  host.innerHTML = '<figure><figcaption>'+w+'×'+h+' — safe-area-inset-bottom '+inset+'px</figcaption>'+
    '<div class="dev" style="width:'+w+'px;height:'+h+'px"><iframe src="'+src+'" width="'+w+'" height="'+h+'"></iframe>'+
@@ -34,6 +39,15 @@
  // this reason.
  const frame = host.querySelector('iframe');
  frame.addEventListener('load', () => {
-   frame.contentDocument.documentElement.style.setProperty('--safe-bottom', inset + 'px');
+   frame.contentDocument.documentElement.style.setProperty('--safe-bottom', bare ? 0 : inset + 'px');
+   if (!tab) return;
+   // The skin renders by replacing innerHTML, so the button has to be found
+   // after it settles, and `ready` is what a screenshot script waits on.
+   setTimeout(() => {
+     const hit = [...frame.contentDocument.querySelectorAll('button,a')]
+       .find((el) => el.textContent.trim().toLowerCase() === tab.toLowerCase());
+     if (hit) hit.click();
+     setTimeout(() => { document.title = 'ready'; }, 1200);
+   }, 1500);
  });
 </script>

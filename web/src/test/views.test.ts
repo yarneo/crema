@@ -351,6 +351,19 @@ test('with nothing recorded at all, the chart says what will fill it', () => {
   assert.ok(!html.includes('starter-advice'));
 });
 
+test('the dose you actually pulled is editable, not just displayed', () => {
+  // Dose, yield and temp were render-only: the AI could change them through
+  // Apply but the barista could not say "I pull 20g", which is the one number
+  // only they know.
+  const html = renderRecipe({
+    profileTitle: 'Adaptive v3', grind: 0.7, doseG: 18, targetYieldG: 36, temperatureC: 93
+  });
+  for (const field of ['doseG', 'targetYieldG', 'temperatureC', 'grind']) {
+    assert.match(html, new RegExp(`data-action="inc" data-field="${field}"`), `${field} has no increase`);
+    assert.match(html, new RegExp(`data-action="dec" data-field="${field}"`), `${field} has no decrease`);
+  }
+});
+
 test('AI setup supports key reveal and a provider test', () => {
   const html = renderSetup({
     provider: 'anthropic', apiKey: 'secret', model: '', baseUrl: '', grinderName: '', grinderRange: '',
@@ -360,6 +373,29 @@ test('AI setup supports key reveal and a provider test', () => {
   assert.match(html, /type="password"/);
   assert.match(html, /data-action="toggle-api-key"/);
   assert.match(html, /data-action="test-ai"/);
+});
+
+// The Mac-server default base URL was removed (localhost is right only on the
+// Mac itself), which silently invalidated every existing blank field: isReady
+// went false and advice just stopped, three screens from the cause.
+test('a Mac server with no address says so where it is fixed', () => {
+  const base = {
+    provider: 'server' as const, apiKey: '', model: '', baseUrl: '', grinderName: '', grinderRange: '',
+    ready: false, saved: false, storageBlocked: false, keyVisible: false, testing: false, testStatus: null,
+    theme: 'dark' as const
+  };
+  const blank = renderSetup(base);
+  assert.match(blank, /class="needed"/);
+  assert.match(blank, /AI advice stays switched off/);
+  assert.match(blank, /placeholder="http:\/\/your-mac\.local:8877"/);
+
+  const filled = renderSetup({ ...base, baseUrl: 'http://tiny.local:8877', ready: true });
+  assert.ok(!filled.includes('class="needed"'));
+  assert.ok(!filled.includes('AI advice stays switched off'));
+
+  // and it is specific to the Mac server: a blank base URL is normal elsewhere
+  const anthropic = renderSetup({ ...base, provider: 'anthropic' as const, apiKey: 'k', ready: true });
+  assert.ok(!anthropic.includes('class="needed"'));
 });
 
 // ---- ways out of the skin ------------------------------------------------
@@ -696,6 +732,43 @@ test('stored shot detail exposes the full review workflow', () => {
   for (const action of ['toggle-stored-rebuttal', 'review-shot', 'apply-stored', 'delete-shot', 'reconsider-stored']) {
     assert.match(detailHtml, new RegExp(`data-action="${action}"`));
   }
+});
+
+// Pressing Reconsider at the bottom of a long detail page used to change
+// nothing within sight: the busy state showed on the *other* button and the
+// outcome rendered above the action row, off-screen. It read as a dead button.
+const storedDetail = (over: Record<string, unknown>) => renderShots(
+  [{ id: 'shot-1', when: 'now', profileTitle: 'Bloom', coffeeName: 'Kenya', summary: '18g → 40g' }],
+  1,
+  'shot-1',
+  {
+    id: 'shot-1', summary: '18g → 40g', when: 'now', profileTitle: 'Bloom', coffeeName: 'Kenya', rating: 'sweet',
+    advice: { summary: 'Go finer', diagnosis: 'The pour ran fast.' },
+    chart: { elapsedS: [0, 1], pressureBar: [0, 9], flowMlS: [0, 2], evidence: [], phases: null },
+    ready: true, canApply: true, rebuttalOpen: true, rebuttalText: 'not sour', ...over
+  } as never
+);
+
+test('a stored reconsider in flight says so on the button that was pressed', () => {
+  const idle = storedDetail({});
+  assert.match(idle, /type="submit"[^>]*>Reconsider</);
+
+  const busy = storedDetail({ busy: true });
+  assert.match(busy, /type="submit" disabled>Rethinking…</);
+  assert.ok(!/type="submit"[^>]*>Reconsider</.test(busy));
+});
+
+test('a stored review error lands inside the open rebuttal form, not above it', () => {
+  const open = storedDetail({ error: 'Could not reach the model.' });
+  const form = open.slice(open.indexOf('data-action="reconsider-stored"'));
+  assert.match(form, /Could not reach the model\./);
+  // and exactly once — not also in the row the user has scrolled past
+  assert.equal(open.split('Could not reach the model.').length - 1, 1);
+
+  // with the form closed it goes back to the detail body, which is then in view
+  const closed = storedDetail({ error: 'Could not reach the model.', rebuttalOpen: false });
+  assert.match(closed, /Could not reach the model\./);
+  assert.equal(closed.split('Could not reach the model.').length - 1, 1);
 });
 
 test('shot charts show targets, the previous shot, and an expanded detail view', () => {

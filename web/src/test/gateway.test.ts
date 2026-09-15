@@ -295,7 +295,17 @@ test('AI-authored profiles are created through the profile record endpoint', asy
   });
   const created = await gateway.createProfile({ title: 'AI · Kenya', steps: [] });
   assert.equal(created.id, 'p1');
-  assert.deepEqual(JSON.parse(body), { profile: { title: 'AI · Kenya', steps: [] } });
+  // The four defaults are Decaid's requirement, not ours — see createProfile.
+  assert.deepEqual(JSON.parse(body), {
+    profile: {
+      title: 'AI · Kenya',
+      steps: [],
+      version: '2',
+      target_volume: 0,
+      target_volume_count_start: 0,
+      tank_temperature: 0
+    }
+  });
 });
 
 test('bean corrections and deletion use the bean resource', async () => {
@@ -398,4 +408,49 @@ test('a device the gateway has never seen reads as missing', () => {
 test('a reachable device that still refuses is its own case', () => {
   const devices = [{ name: 'DE1', id: 'b', state: 'disconnected', type: 'machine', available: true }];
   assert.match(describeFailedConnect('machine', devices), /found but would not connect/);
+});
+
+/**
+ * Decaid requires four fields on a new profile that Crema never authored, so
+ * every AI-written profile and every profile built in the step editor failed
+ * to save with a bare "Invalid request". Verified against a live gateway 0.8.6,
+ * which names one missing field per attempt.
+ */
+test('a created profile carries the fields Decaid requires', async () => {
+  let sent: Record<string, unknown> | null = null;
+  const fetchImpl = (async (_url: string, init?: RequestInit) => {
+    sent = JSON.parse(String(init?.body)).profile;
+    return new Response(JSON.stringify({ id: 'p1', profile: sent }), { status: 200 });
+  }) as typeof fetch;
+
+  const gw = new Gateway({ origin: 'http://gw:8080', fetch: fetchImpl });
+  await gw.createProfile({ title: 'Authored', steps: [], target_weight: 36 });
+
+  const body = sent as unknown as Record<string, unknown>;
+  assert.equal(body['tank_temperature'], 0);
+  assert.equal(body['target_volume'], 0);
+  assert.equal(body['target_volume_count_start'], 0);
+  assert.equal(body['version'], '2');
+  // what the caller did set survives
+  assert.equal(body['title'], 'Authored');
+  assert.equal(body['target_weight'], 36);
+});
+
+test('a duplicated profile keeps its own values rather than the defaults', async () => {
+  let sent: Record<string, unknown> | null = null;
+  const fetchImpl = (async (_url: string, init?: RequestInit) => {
+    sent = JSON.parse(String(init?.body)).profile;
+    return new Response(JSON.stringify({ id: 'p1', profile: sent }), { status: 200 });
+  }) as typeof fetch;
+
+  const gw = new Gateway({ origin: 'http://gw:8080', fetch: fetchImpl });
+  await gw.createProfile({
+    version: '2', title: 'Copy of Adaptive', steps: [],
+    target_volume: 36, target_volume_count_start: 3, tank_temperature: 92
+  });
+
+  const body = sent as unknown as Record<string, unknown>;
+  assert.equal(body['target_volume'], 36);
+  assert.equal(body['target_volume_count_start'], 3);
+  assert.equal(body['tank_temperature'], 92);
 });

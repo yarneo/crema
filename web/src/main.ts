@@ -33,7 +33,7 @@ import { analyseFlowPhases } from './advice/phases.ts';
 import { parseAdvice } from './advice/parse.ts';
 import { adviceToDiff } from './advice/proposal.ts';
 import { buildPrompt, buildStarterPrompt, daysOffRoast } from './advice/prompt.ts';
-import { askProvider, resolveBaseUrl } from './advice/provider.ts';
+import { askProvider, PROVIDERS, resolveBaseUrl, type ProviderId } from './advice/provider.ts';
 import { discoverServer } from './advice/discover.ts';
 import type { Advice } from './advice/schema.ts';
 import type { ShotCurves } from './advice/curves.ts';
@@ -71,7 +71,7 @@ import {
   type ShotChartModel,
   type Tab
 } from './ui/views.ts';
-import { isReady, loadKnownGhc, loadSettings, saveKnownGhc, saveSettings, type CremaSettings, type Theme } from './settings.ts';
+import { DEFAULT_SETTINGS, isReady, loadKnownGhc, loadSettings, saveKnownGhc, saveSettings, type CremaSettings, type Theme } from './settings.ts';
 import { watchSafeArea } from './safearea.ts';
 import { captureForms, captureScroll, restoreForms, restoreScroll } from './formstate.ts';
 import { attachScrub } from './ui/scrub.ts';
@@ -1236,7 +1236,21 @@ function bumpPendingGrind(delta: number): void {
 
 async function reviewStoredShot(id: string, objection?: string): Promise<void> {
   const record = state.records.find((candidate) => candidate.id === id);
-  if (!record || !hasCurves(record) || state.reviewingShotId !== null || !isReady(state.settings)) return;
+  if (!record) return;
+  // A request already running owns the screen, and its button is disabled;
+  // the rest are user-fixable states, so say which one rather than returning
+  // silently and leaving a button that looks alive but does nothing.
+  if (state.reviewingShotId !== null) return;
+  if (!hasCurves(record)) {
+    state.shotActionError = 'This shot was recorded without curves, so there is nothing to review.';
+    render();
+    return;
+  }
+  if (!isReady(state.settings)) {
+    state.shotActionError = 'No AI provider is set up yet — open Settings and add one.';
+    render();
+    return;
+  }
 
   state.reviewingShotId = id;
   state.shotActionError = null;
@@ -1259,6 +1273,12 @@ async function reviewStoredShot(id: string, objection?: string): Promise<void> {
   } finally {
     state.reviewingShotId = null;
     render();
+    // The rebuttal form sits at the bottom of a long page. `restoreScroll` puts
+    // the user back where they were, which is the right default but can leave
+    // the answer they just asked for below the fold.
+    if (state.shotActionError) {
+      root.querySelector('.rebuttal .err')?.scrollIntoView({ block: 'nearest' });
+    }
   }
 }
 
@@ -1852,10 +1872,53 @@ function saveSetup(form: HTMLFormElement, navigate = false): void {
   const ok = saveSettings(state.settings);
   state.storageBlocked = !ok;
   state.settingsSaved = ok;
+  void mirrorSettings();
   if (navigate) {
     state.setupTestStatus = null;
     state.tab = 'brew';
   }
+  render();
+}
+
+/**
+ * Keep Decaid's copy of the non-secret settings current.
+ *
+ * `localStorage` is scoped to the port Decaid happens to serve the skin from,
+ * and a reinstall clears it — which is how a configured grinder and provider
+ * address vanished without anyone touching them. The key is never mirrored.
+ */
+function mirrorSettings(): Promise<boolean> {
+  const { provider, model, baseUrl, grinderName, grinderRange, theme } = state.settings;
+  return store.saveSettingsMirror({ provider, model, baseUrl, grinderName, grinderRange, theme });
+}
+
+/**
+ * Restore from Decaid's copy when this device has nothing of its own.
+ *
+ * Only ever fills blanks: anything already set here wins, so the mirror can
+ * never overwrite a setting made on this device.
+ */
+async function hydrateSettings(): Promise<void> {
+  const mirror = await store.readSettingsMirror();
+  if (!mirror) return;
+
+  const current = state.settings;
+  const merged = {
+    ...current,
+    provider: current.provider === DEFAULT_SETTINGS.provider && (PROVIDERS as readonly string[]).includes(mirror.provider)
+      ? (mirror.provider as ProviderId)
+      : current.provider,
+    model: current.model || mirror.model || '',
+    baseUrl: current.baseUrl || mirror.baseUrl || '',
+    grinderName: current.grinderName || mirror.grinderName || '',
+    grinderRange: current.grinderRange || mirror.grinderRange || '',
+    theme: current.theme === 'dark' && mirror.theme === 'light' ? 'light' as const : current.theme
+  };
+
+  if (JSON.stringify(merged) === JSON.stringify(current)) return;
+  state.settings = merged;
+  state.storageBlocked = !saveSettings(state.settings);
+  applyTheme(state.settings.theme);
   render();
 }
 
@@ -2627,6 +2690,7 @@ void gateway.readMachineState().then((snapshot) => {
   state.groupTempC = snapshot.groupTemperature ?? snapshot.mixTemperature ?? null;
   render();
 }).catch(() => {});
+void hydrateSettings();
 void store.readRecent().then((records) => {
   state.records = records;
 

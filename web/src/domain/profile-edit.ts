@@ -58,6 +58,9 @@ export function newProfile(title = 'My profile'): Profile {
     notes: '',
     beverage_type: 'espresso',
     target_weight: 36,
+    // The wire fills the rest of what Decaid demands (see `createProfile`);
+    // version is set here so a profile reads as v2 before it is ever saved.
+    version: '2',
     steps: [
       blankStep({ name: 'preinfuse', pump: 'flow', target: 4, seconds: 8, transition: 'fast' }),
       blankStep({ name: 'extract', pump: 'pressure', target: 9, seconds: 25, transition: 'smooth' })

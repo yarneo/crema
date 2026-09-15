@@ -1310,3 +1310,8 @@ svg[data-scrub] { touch-action: none; }
 /* A one-line explanation under a field, for the choices that need one. */
 .field-note { display: block; margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.35; }
 .setup label > input[disabled] { opacity: .6; }
+
+/* A required field that is empty. Said in the label rather than only on
+   submit, because these settings have no submit — they save as you leave
+   each field, so there is no later moment to be told. */
+.needed { color: var(--bad); font-weight: 600; }

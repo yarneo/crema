@@ -18,6 +18,7 @@ import type { ShotCurves } from './advice/curves.ts';
 
 const NAMESPACE = 'crema';
 const INDEX_KEY = 'shot-index';
+const SETTINGS_KEY = 'settings-mirror';
 const RETAINED_HISTORY = 100;
 
 export interface ShotRecord {
@@ -58,6 +59,29 @@ export interface ShotIndex {
 
 export interface BeanDialIn {
   recipe: Recipe;
+}
+
+/**
+ * The settings worth surviving a reinstall.
+ *
+ * Settings live in `localStorage`, which is scoped to the origin Decaid serves
+ * the skin from — and reinstalling the skin wipes it, taking the grinder and
+ * the provider address with it. A shot survives that because it lives here, in
+ * Decaid's own store, so the parts of the setup that are not secret are
+ * mirrored here too.
+ *
+ * The API key is deliberately not among them. It stays on the device, in
+ * browser storage, and is never written to the gateway — the same rule as
+ * before. Losing a key on reinstall is a re-paste; losing it to the wrong
+ * place is not recoverable.
+ */
+export interface SettingsMirror {
+  provider: string;
+  model: string;
+  baseUrl: string;
+  grinderName: string;
+  grinderRange: string;
+  theme: string;
 }
 
 export class Store {
@@ -126,6 +150,14 @@ export class Store {
     } catch {
       // A missing preset is already the desired result.
     }
+  }
+
+  readSettingsMirror(): Promise<SettingsMirror | null> {
+    return this.get<SettingsMirror>(SETTINGS_KEY);
+  }
+
+  saveSettingsMirror(mirror: SettingsMirror): Promise<boolean> {
+    return this.set(SETTINGS_KEY, mirror);
   }
 
   /**
