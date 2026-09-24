@@ -7,11 +7,17 @@ namespace eval ::crema::pages {}
 # active: which tab gets the accent + underline. prenav: script run before
 # navigating away (e.g. beans saves its fields).
 proc ::crema::pages::add_nav {page active {prenav {}}} {
+	# Profiles opens de1app's own settings pages, so it must enter them the way
+	# de1app does: through show_settings, which snapshots ::settings first. Ok
+	# compares against that snapshot to decide whether the app must restart, and
+	# Cancel restores from it. Loading the page directly skipped the snapshot, so
+	# the first Ok after every boot saw every restart-key as "changed" and quit
+	# the app, and Cancel had nothing to go back to.
 	set tabs {
 		brew     "Brew"          120  90  { ::crema::go_home }
 		shots    "Shots"         320  95  { dui page load crema_dashboard }
 		beans    "Beans & grind" 600  225 { dui page load crema_beans }
-		profiles "Profiles"      1040 135 { ::page_to_show_when_off "settings_1" ; after 250 { catch { fill_profiles_listbox ; set_profiles_scrollbar_dimensions } } }
+		profiles "Profiles"      1040 135 { ::show_settings settings_1 ; after 250 { catch { fill_profiles_listbox ; set_profiles_scrollbar_dimensions } } }
 		settings "Settings"      1340 140 { ::page_to_show_when_off "iconik_settings" }
 	}
 	foreach {key label nx w cmd} $tabs {
@@ -627,7 +633,9 @@ namespace eval ::crema::pages::crema_advice {
 		# "AI · <bean>" active (not a shared profile like "Best overall pressure
 		# profile"). created_profile already saved under this name; for switch/keep
 		# snapshot the now-loaded profile + recipe here, after apply_recipe.
-		if {!$made_profile} { catch { ::crema::advisor::save_bean_profile } }
+		# Always, even after a created profile: apply_recipe ran after that save,
+		# so this snapshot is what puts the AI's yield/temp/dose into the file.
+		catch { ::crema::advisor::save_bean_profile }
 		set page [namespace tail [namespace current]]
 		variable primary_mode
 		set primary_mode "done"

@@ -702,7 +702,9 @@ namespace eval ::crema::advisor {
 		# under this name; for switch/keep we snapshot the now-loaded profile +
 		# recipe so Apply ALWAYS yields "AI · <bean>" instead of leaving a shared
 		# profile like "Best overall pressure profile" active.
-		if {!$made_profile} { save_bean_profile }
+		# Always, even after a created profile: apply_recipe ran after it was
+		# saved, so this is what puts the AI's yield/temp/dose into the file.
+		save_bean_profile
 	}
 
 	# After an app restart the advisor memory is empty but the last shot's
@@ -1148,6 +1150,38 @@ namespace eval ::crema::advisor {
 		return "AI · [string range $bean 0 24]"
 	}
 
+	# Write the in-memory profile to the bean's OWN AI file and make it current.
+	#
+	# Core `save_profile` picks its target file from whatever profile is loaded:
+	# if that profile is one of Decent's read-only presets it saves INTO that
+	# preset's file (keeping the original only as `read_only_backup`), and if the
+	# title matches `original_profile_title` it reuses `profile_filename`. Crema
+	# saved with the previous profile still loaded, so an AI profile for one bean
+	# overwrote "Blooming Espresso" and another overwrote "Adaptive v3". Pinning
+	# the filename, clearing read-only and matching the original title makes the
+	# target the AI file and nothing else.
+	#
+	# `save_profile 0` also skips core's delayed reselect (after 500 ms it would
+	# reload the file from disk and undo any recipe applied in the meantime) and
+	# its habit of renaming the title to the literal "Saved".
+	proc save_ai_profile {title} {
+		set fname [resolve_profile_file $title]
+		if {$fname eq ""} { set fname [::profile::filename_from_title $title] }
+		set ::settings(read_only) 0
+		unset -nocomplain ::settings(read_only_backup)
+		set ::settings(author) "Crema AI"
+		set ::settings(profile_filename) $fname
+		set ::settings(original_profile_title) $title
+		set ::settings(profile_title) $title
+		set ::settings(profile_to_save) $title
+		set ::settings(profile) $title
+		save_profile 0
+		set ::settings(profile_title) $title
+		catch { ::save_settings }
+		catch { send_de1_settings_soon }
+		return $fname
+	}
+
 	# Build and activate a AI-authored advanced (step-based) profile
 	proc apply_created_profile {} {
 		variable advice
@@ -1203,11 +1237,7 @@ namespace eval ::crema::advisor {
 				}
 			}
 			catch { set ::settings(espresso_temperature) [dict get [lindex $steps 0] temperature] }
-			save_profile
-			# save_profile leaves profile_title as the literal "Saved"
-			set ::settings(profile_title) $title
-			catch { ::save_settings }
-			catch { send_de1_settings_soon }
+			save_ai_profile $title
 			msg -INFO "crema: created + activated profile '$title' ([llength $steps] steps)"
 		} err]} {
 			msg -ERROR "crema: apply_created_profile failed: $err"
@@ -1239,20 +1269,13 @@ namespace eval ::crema::advisor {
 		if {[catch {
 			set ai_title [ai_profile_title]
 			set src [string trim [ifexists ::settings(profile_title) ""]]
-			set ::settings(profile_title) $ai_title
-			set ::settings(profile_to_save) $ai_title
-			set ::settings(profile) $ai_title
 			# note where it came from, but don't stack "Based on AI · ..." chains
 			catch {
 				if {$src ne "" && $src ne $ai_title && ![string match "AI *" $src]} {
 					set ::settings(profile_notes) "Based on $src"
 				}
 			}
-			save_profile
-			# save_profile overwrites profile_title with the literal "Saved"
-			set ::settings(profile_title) $ai_title
-			catch { ::save_settings }
-			catch { send_de1_settings_soon }
+			save_ai_profile $ai_title
 			msg -INFO "crema: saved bean profile '$ai_title' (from '$src')"
 		} err]} {
 			msg -ERROR "crema: save_bean_profile failed: $err"
@@ -1335,6 +1358,32 @@ proc ::crema::after_shot_hook {event_dict} {
 }
 
 ::de1::event::listener::on_major_state_change_add ::crema::after_shot_hook
+
+# de1app's settings Ok button restarts the whole app when any of ~30
+# "restart-required" settings changed while you were in there, when the scale
+# address changed (common right after boot, while the scale is still
+# reconnecting), or when an overnight update has landed. It only ever says
+# "Please quit and restart", which reads as a crash. Name the cause in the log,
+# on the way out, so a restart can be told apart from a real failure.
+proc ::crema::log_restart_reason {args} {
+	catch {
+		if {![array exists ::settings_backup]} { return }
+		foreach k {bluetooth_address usb_address enable_fahrenheit orientation screen_size_width
+				saver_brightness use_finger_down_for_tap log_enabled hot_water_idle_temp
+				espresso_warmup_timeout language skin waterlevel_indicator_on
+				default_font_calibration waterlevel_indicator_blink display_rate_espresso
+				display_espresso_water_delta_number display_group_head_delta_number
+				display_pressure_delta_line display_flow_delta_line display_weight_delta_line
+				allow_unheated_water display_time_in_screen_saver enabled_plugins
+				app_auto_update plugin_tabs scale_bluetooth_address usb_scale_address} {
+			set was [ifexists ::settings_backup($k)]
+			set now [ifexists ::settings($k)]
+			if {$was ne $now} { msg -NOTICE "crema: restart-required setting changed: $k '$was' -> '$now'" }
+		}
+		if {[ifexists ::app_has_updated] == 1} { msg -NOTICE "crema: restarting because an app update was installed" }
+	}
+}
+catch { trace add execution app_exit enter ::crema::log_restart_reason }
 
 # Self-heal corrupt profiles at startup. A profile file that got truncated to a
 # near-empty size (seen: a 1-byte "Best overall pressure profile.tcl") makes
