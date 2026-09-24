@@ -109,6 +109,24 @@ provider (see [Choosing a provider](#choosing-a-provider)).
 4. **Run the setup wizard.** On first launch Crema asks for two things — your grinder
    and your AI provider + key. That's it. Pull a shot.
 
+## What's new in v1.1.2
+
+Two fixes to the classic tablet skin, both found on a real machine.
+
+- **AI profiles no longer overwrite Decent's own profiles.** de1app saves a new
+  profile into the file of whichever profile is loaded, and Crema saved with the
+  previous one still loaded — so an AI profile for one bean could replace
+  "Blooming Espresso" or "Adaptive v3". Each bean's AI profile now always saves
+  to its own file. If a preset of yours shows an "AI · …" name, its original is
+  kept inside that file as `read_only_backup` and can be restored.
+- **Profiles no longer restarts the app.** Crema opened de1app's profile page
+  without the settings snapshot de1app takes on the way in, so the first Ok
+  after every boot decided everything had changed and quit with "Please quit and
+  restart". Cancel on that page now works too.
+
+Crema now also notes in the log why de1app restarted itself, so a deliberate
+restart can be told apart from a crash. The Decaid skin is unchanged.
+
 ## What's new in v1.1.1
 
 Three faults that only showed up on a real machine, all in the Decaid skin.
