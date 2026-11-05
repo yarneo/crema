@@ -25,6 +25,62 @@ _CLAUDE_CANDIDATES = [
 _MODEL = os.environ.get("CREMA_MODEL", "opus")
 
 
+# Plugins installed in the user's Claude Code run hooks with `node` (e.g. a
+# SessionEnd cleanup hook). Under launchd PATH is minimal, so `node` from nvm,
+# Homebrew or Volta is invisible and the hook kills an otherwise good run.
+def _node_dirs() -> list[str]:
+    home = Path.home()
+    dirs = [
+        home / ".volta/bin",
+        home / ".local/bin",
+        Path("/opt/homebrew/bin"),
+        Path("/usr/local/bin"),
+    ]
+    nvm = home / ".nvm/versions/node"
+    if nvm.is_dir():
+        dirs += sorted(nvm.glob("*/bin"), reverse=True)
+    fnm = home / ".local/state/fnm_multishells"
+    if fnm.is_dir():
+        dirs += sorted(fnm.glob("*/bin"), reverse=True)
+    return [str(d) for d in dirs if (d / "node").exists()]
+
+
+def _env() -> dict[str, str]:
+    path = os.environ.get("PATH", "").split(os.pathsep)
+    claude = find_claude()
+    extra = ([str(Path(claude).resolve().parent)] if claude else []) + _node_dirs()
+    path += [d for d in extra if d not in path]
+    return {
+        **os.environ,
+        "PATH": os.pathsep.join(p for p in path if p),
+        "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "8000",
+    }
+
+
+def _result_text(result: subprocess.CompletedProcess) -> str:
+    """The model's reply, tolerating a non-zero exit from a post-run hook.
+
+    A SessionEnd hook runs after the answer is already printed; if it fails
+    (missing `node`, a broken plugin) claude exits 1 with a perfectly good
+    envelope on stdout. Throwing that away turned a finished shot analysis
+    into an HTTP 500, so a successful envelope wins over the exit code.
+    """
+    try:
+        envelope = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        envelope = None
+
+    if isinstance(envelope, dict):
+        if not envelope.get("is_error") and envelope.get("result"):
+            return str(envelope["result"])
+        if result.returncode == 0:
+            return str(envelope.get("result", ""))
+    elif result.returncode == 0:
+        return result.stdout
+
+    raise ClaudeError(_describe_failure(result.returncode, result.stderr, result.stdout))
+
+
 def find_claude() -> str | None:
     found = shutil.which("claude")
     if found:
@@ -113,14 +169,9 @@ def ask_text(prompt: str, timeout: int = 240) -> str:
         _argv(),
         input=prompt,
         capture_output=True, text=True, timeout=timeout,
-        env={**os.environ, "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "8000"},
+        env=_env(),
     )
-    if result.returncode != 0:
-        raise ClaudeError(_describe_failure(result.returncode, result.stderr, result.stdout))
-    try:
-        return json.loads(result.stdout).get("result", "")
-    except json.JSONDecodeError:
-        return result.stdout
+    return _result_text(result)
 
 
 def ask_json(prompt: str, timeout: int = 240) -> dict:
@@ -131,18 +182,9 @@ def ask_json(prompt: str, timeout: int = 240) -> dict:
         capture_output=True,
         text=True,
         timeout=timeout,
-        env={**os.environ, "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "8000"},
+        env=_env(),
     )
-    if result.returncode != 0:
-        raise ClaudeError(_describe_failure(result.returncode, result.stderr, result.stdout))
-
-    try:
-        envelope = json.loads(result.stdout)
-        text = envelope.get("result", "")
-    except json.JSONDecodeError:
-        text = result.stdout
-
-    return _extract_json(text)
+    return _extract_json(_result_text(result))
 
 
 def _extract_json(text: str) -> dict:
