@@ -101,7 +101,7 @@ export const ADVICE_SCHEMA_TEXT = `{
   "profile": {
     "action": "keep" | "switch" | "create",
     "switch_to": <existing profile title or null>,
-    "created_profile": <null, or {"title","notes","target_weight_g","steps":[{"name","pump":"pressure"|"flow","transition":"fast"|"smooth","temperature":<C>,"seconds":<float>,"volume":<ml or 0>,"weight":<g or 0>,"sensor":"coffee","pressure":<bar, only when pump is pressure>,"flow":<ml/s, only when pump is flow>,"exit":<null or {"type":"pressure"|"flow","condition":"over"|"under","value":<float>}>}]}>,
+    "created_profile": <null, or {"title","notes","target_weight_g","steps":[{"name","pump":"pressure"|"flow","transition":"fast"|"smooth","temperature":<C>,"seconds":<float>,"volume":<ml or 0>,"weight":<g or 0>,"sensor":"coffee","pressure":<bar, only when pump is pressure>,"flow":<ml/s, only when pump is flow>,"pressure_limit_bar":<on a flow step, the pressure ceiling in bar (above 0 through 10), otherwise null. Encode every recommended pressure ceiling on its step>,"exit":<null or {"type":"pressure"|"flow","condition":"over"|"under","value":<float>}>}]}>,
     "reason": "<1 sentence or empty>"
   },
   "screen_summary": "<max 160 chars, imperative, what to do>"

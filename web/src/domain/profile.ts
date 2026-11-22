@@ -27,7 +27,7 @@ export interface ProfileExit {
   value: number;
 }
 
-/** Caps the driven variable around `value` within +/- `range`. */
+/** Caps the non-driven variable around `value` within +/- `range`. */
 export interface ProfileLimiter {
   value: number;
   range: number;

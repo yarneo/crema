@@ -12,6 +12,7 @@
 
 import type { Gateway } from './gateway/client.ts';
 import { EMPTY_RATING, type Rating } from './domain/rating.ts';
+import type { Profile } from './domain/profile.ts';
 import type { Recipe } from './domain/recipe.ts';
 import type { Advice } from './advice/schema.ts';
 import type { ShotCurves } from './advice/curves.ts';
@@ -51,6 +52,8 @@ export interface ShotRecord {
   applied: string[];
   /** The next-shot setup after Apply; kept separate from what this shot used. */
   appliedRecipe?: Recipe;
+  appliedProfileId?: string;
+  appliedProfile?: Profile;
 }
 
 export interface ShotIndex {
@@ -59,6 +62,8 @@ export interface ShotIndex {
 
 export interface BeanDialIn {
   recipe: Recipe;
+  profileId?: string;
+  profile?: Profile;
 }
 
 /**
@@ -140,8 +145,8 @@ export class Store {
     return this.get<BeanDialIn>(`bean-dial-in-${beanId}`);
   }
 
-  saveBeanDialIn(beanId: string, recipe: Recipe): Promise<boolean> {
-    return this.set(`bean-dial-in-${beanId}`, { recipe });
+  saveBeanDialIn(beanId: string, preset: BeanDialIn): Promise<boolean> {
+    return this.set(`bean-dial-in-${beanId}`, preset);
   }
 
   async deleteBeanDialIn(beanId: string): Promise<void> {
@@ -172,7 +177,7 @@ export class Store {
 
     const ids = await this.readIndex();
     if (!ids.includes(record.id)) {
-      await this.set(INDEX_KEY, { ids: [...ids, record.id] });
+      return this.set(INDEX_KEY, { ids: [...ids, record.id] });
     }
     return true;
   }

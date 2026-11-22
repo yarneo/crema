@@ -217,12 +217,38 @@ function clampStep(step: ProfileStep): ProfileStep {
   return next;
 }
 
+function readAuthoredStep(raw: unknown): ProfileStep | null {
+  const step = readProfileStep(raw);
+  if (!step || !isRecord(raw)) return null;
+  step.volume ??= 0;
+  const cap = raw['pressure_limit_bar'];
+  if (cap != null && cap !== '') {
+    const numeric = typeof cap === 'number' || (typeof cap === 'string' && cap.trim() !== '');
+    const value = numeric ? Number(cap) : NaN;
+    if (!Number.isFinite(value) || value < 0 || value > DE1_LIMITS.pressureBar.max ||
+        (value > 0 && step.pump !== 'flow')) {
+      throw new Error(`Invalid pressure ceiling on step “${step.name}”.`);
+    }
+    step.limiter = value === 0 ? null : { value, range: step.limiter?.range ?? 0.6 };
+  }
+  if (raw['limiter'] != null && cap == null && !step.limiter) {
+    throw new Error(`Incomplete limiter on step “${step.name}”.`);
+  }
+  if (step.limiter) {
+    const max = step.pump === 'flow' ? DE1_LIMITS.pressureBar.max : DE1_LIMITS.flowMlS.max;
+    if (step.limiter.value < 0 || step.limiter.value > max || step.limiter.range < 0 || step.limiter.range > 8) {
+      throw new Error(`Invalid limiter on step “${step.name}”.`);
+    }
+  }
+  return step;
+}
+
 function readCreatedProfile(raw: unknown): CreatedProfile | null {
   if (!isRecord(raw)) return null;
 
   const title = coerceString(raw['title']);
   const steps = (Array.isArray(raw['steps'])
-    ? raw['steps'].map(readProfileStep).filter((s): s is ProfileStep => s !== null)
+    ? raw['steps'].map(readAuthoredStep).filter((s): s is ProfileStep => s !== null)
     : []
   )
     .slice(0, DE1_LIMITS.steps.max)
@@ -307,7 +333,12 @@ export function parseAdvice(replyText: string, context: ParseContext = {}): Pars
   const evidence = readEvidence(raw['evidence'], context.shotDurationS);
   warnings.push(...evidence.warnings);
 
-  const profile = readProfile(raw['profile']);
+  let profile: ReturnType<typeof readProfile>;
+  try {
+    profile = readProfile(raw['profile']);
+  } catch (cause) {
+    return { ok: false, error: (cause as Error).message };
+  }
   warnings.push(...profile.warnings);
 
   const diagnosis = coerceString(raw['diagnosis']);

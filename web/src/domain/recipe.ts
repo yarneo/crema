@@ -57,7 +57,7 @@ const UNITS: Record<RecipeField, string> = {
  * Grind is the tightest because 0.1 of a dial is a real move on a Lagom.
  */
 const EPSILON: Partial<Record<RecipeField, number>> = {
-  grind: 0.05,
+  grind: 0.00001,
   doseG: 0.05,
   targetYieldG: 0.05,
   temperatureC: 0.05
@@ -179,8 +179,7 @@ export function applyDiff(current: Recipe, diff: RecipeDiff): Recipe {
 export function formatValue(field: RecipeField, value: number | string | null): string {
   if (value === null || value === '') return '—';
   if (!isNum(value)) return String(value);
-  const decimals = field === 'temperatureC' || field === 'grind' ? 1 : 1;
-  return value.toFixed(decimals);
+  return field === 'grind' ? formatGrind(value) : value.toFixed(1);
 }
 
 /**

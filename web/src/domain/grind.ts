@@ -7,19 +7,16 @@ const MIN_SANE_GRIND = 0;
 const MAX_SANE_GRIND = 100;
 
 /**
- * Snap to the 0.05 grid so a manual bump and an advisor's grind land on the
- * same scale. Trailing zeros go, because "0.10" reads as more precision than
- * a dial actually has: 0.10 -> 0.1, 0.15 -> 0.15.
+ * Snap manual adjustments to the stepper's 0.05 grid.
  */
 export function snapGrind(value: number): number {
   if (!Number.isFinite(value)) return value;
   return Math.round(value * 20) / 20;
 }
 
-/** Render a snapped grind the way the dial is labelled. */
+/** Keep the precision of the grinder's actual setting when displaying or saving it. */
 export function formatGrind(value: number): string {
-  const snapped = snapGrind(value);
-  return snapped.toFixed(2).replace(/(\.\d)0$/, '$1');
+  return Number.isInteger(value) ? value.toFixed(1) : String(value);
 }
 
 /**
@@ -50,10 +47,10 @@ export function resolveGrind(
   target: number | null,
   delta: number | null
 ): number | null {
-  if (isSaneGrind(target)) return snapGrind(target);
+  if (isSaneGrind(target)) return target;
 
   if (typeof delta === 'number' && Number.isFinite(delta) && delta !== 0 && current !== null) {
-    const derived = snapGrind(current + delta);
+    const derived = Number((current + delta).toFixed(10));
     if (isSaneGrind(derived)) return derived;
   }
 

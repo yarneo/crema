@@ -102,9 +102,8 @@ test('the whole dial is reachable one tap at a time', () => {
   assert.equal(grind, 1.35);
 });
 
-test('a change smaller than the dial can express is still no change', () => {
-  // The slack must not swallow the threshold it is guarding.
-  assert.equal(fieldChanged('grind', 0.8, 0.81), false);
+test('grind changes smaller than a manual step can still be recommended', () => {
+  assert.equal(fieldChanged('grind', 0.8, 0.81), true);
   assert.equal(fieldChanged('grind', 0.8, 0.8), false);
 });
 

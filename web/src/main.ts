@@ -31,6 +31,7 @@ import { buildTrail, type TrailNode, type TrailShot } from './domain/trail.ts';
 import { describeRating, EMPTY_RATING, type Rating, type RatingKey } from './domain/rating.ts';
 import { analyseFlowPhases } from './advice/phases.ts';
 import { parseAdvice } from './advice/parse.ts';
+import { applyToWorkflow } from './advice/apply.ts';
 import { adviceToDiff } from './advice/proposal.ts';
 import { buildPrompt, buildStarterPrompt, daysOffRoast } from './advice/prompt.ts';
 import { askProvider, PROVIDERS, resolveBaseUrl, type ProviderId } from './advice/provider.ts';
@@ -123,6 +124,8 @@ const EMPTY_RECIPE: Recipe = {
 };
 
 interface AdviceBase {
+  record?: ShotRecord;
+  starter?: { beanId: string; bean: ShotRecord['bean'] };
   recipe: Recipe;
   starting: boolean;
 }
@@ -1140,7 +1143,7 @@ async function getAdvice(): Promise<void> {
       state.adviceError = parsed.error;
     } else {
       state.advice = parsed.advice;
-      state.adviceBase = { recipe: state.recipe, starting: false };
+      state.adviceBase = { recipe: record.recipe, record, starting: false };
       state.appliedNote = null;
       state.lastAdvice = null;
       // The answer is the thing that was asked for: bring it forward wherever
@@ -1184,7 +1187,7 @@ async function reconsider(text: string): Promise<void> {
       state.adviceError = parsed.error;
     } else {
       state.advice = parsed.advice;
-      state.adviceBase = { recipe: state.recipe, starting: false };
+      state.adviceBase = { recipe: record.recipe, record, starting: false };
       state.appliedNote = null;
       state.lastAdvice = null;
       record.advice = { summary: parsed.advice.screenSummary, diagnosis: parsed.advice.diagnosis, full: parsed.advice };
@@ -1300,7 +1303,7 @@ async function rateStoredShot(id: string, score: number): Promise<void> {
 async function applyStoredAdvice(id: string): Promise<void> {
   const record = state.records.find((candidate) => candidate.id === id);
   if (!record?.advice?.full) return;
-  await applyAdviceResult(record.advice.full, record);
+  await applyAdviceResult(record.advice.full, { recipe: record.recipe, record, starting: false });
 }
 
 async function deleteStoredShot(id: string): Promise<void> {
@@ -1397,76 +1400,45 @@ async function push(patch: WorkflowPatch, before: WorkflowWire, remember = true)
   }
 }
 
-/** Apply profile advice before its numeric recipe changes, matching the DE1 app. */
-async function applyAdviceResult(source: Advice, record: ShotRecord | null): Promise<void> {
+/** Apply the advice the card displayed and remember the setup for this bean. */
+async function applyAdviceResult(source: Advice, base: AdviceBase): Promise<void> {
   if (!state.workflow || state.busy) return;
 
   const before = state.workflow;
-  let applied: WorkflowPatch = {};
   state.busy = true;
   state.error = null;
+  state.shotActionError = null;
   render();
 
   try {
-    let working = before;
-
-    if (source.profile.action === 'create' && source.profile.createdProfile) {
-      const authored = source.profile.createdProfile;
-      const beanName = record?.bean.name ?? currentBean().name;
-      const created = await gateway.createProfile({
-        version: '2',
-        title: beanName ? `AI · ${beanName}` : authored.title,
-        author: 'Crema AI',
-        notes: authored.notes ? `${authored.title} — ${authored.notes}` : authored.title,
-        beverage_type: 'espresso',
-        target_weight: authored.targetWeightG,
-        steps: authored.steps
-      });
-      working = await gateway.selectProfile(created.profile);
-      applied.profile = created.profile;
-      state.profiles = null;
-    } else if (source.profile.action === 'switch' && source.profile.switchTo) {
-      const profiles = state.profiles ?? await gateway.readProfiles();
-      state.profiles = profiles;
-      const wanted = source.profile.switchTo.trim().toLocaleLowerCase();
-      const match = profiles.find((entry) => (entry.profile.title ?? '').trim().toLocaleLowerCase() === wanted);
-      if (!match) throw new Error(`The profile “${source.profile.switchTo}” is not installed in Decaid.`);
-      working = await gateway.selectProfile(match.profile);
-      applied.profile = match.profile;
-    }
-
-    // A profile brings its own defaults. Recalculate against the selected
-    // profile and then write grind/dose/yield/temp so those accepted changes
-    // win rather than being clobbered by the switch.
-    const diff = adviceToDiff(source, workflowToRecipe(working));
-    const recipePatch = diffToWorkflowPatch(diff, working);
-    const updated = Object.keys(recipePatch).length > 0 ? await gateway.updateWorkflow(recipePatch) : working;
-    applied = { ...applied, ...recipePatch };
-
-    const accepted = adviceToDiff(source, workflowToRecipe(before));
+    const { record, starter } = base;
+    const bean = record?.bean ?? starter?.bean;
+    const { updated, patch, profileId, accepted } = await applyToWorkflow(
+      gateway, source, base.recipe, before, bean?.name ?? currentBean().name
+    );
+    if (source.profile.action === 'create') state.profiles = null;
+    // A kept workflow may contain an edited curve with no library ID.
+    const profileSnapshot = profileId ? undefined : updated.profile;
     state.workflow = updated;
     state.recipe = workflowToRecipe(updated);
-    state.lastApplied = Object.keys(applied).length > 0 ? { before, patch: applied } : null;
-    state.appliedNote = describeApplied(
-      accepted,
-      source.profile.action !== 'keep' ? source.profile.switchTo : null,
-      state.starter !== null
-    );
-    state.lastAdvice = {
-      advice: source,
-      base: state.adviceBase ?? { recipe: workflowToRecipe(before), starting: state.starter !== null }
-    };
+    state.lastApplied = Object.keys(patch).length ? { before, patch } : null;
+    state.appliedNote = describeApplied(accepted,
+      source.profile.action === 'keep' ? null : updated.profile?.title ?? null, base.starting);
+    state.lastAdvice = { advice: source, base };
 
     if (record) {
-      const accepted = adviceToDiff(source, workflowToRecipe(before)).changes.map((change) => change.field);
-      if (source.profile.action !== 'keep') accepted.push('profileTitle');
-      record.applied = [...new Set(accepted)];
-      record.appliedRecipe = workflowToRecipe(updated);
-      await store.saveShot(record);
+      const fields = accepted.changes.map(change => change.field);
+      if (source.profile.action !== 'keep') fields.push('profileTitle');
+      const latest = state.records.find(shot => shot.id === record.id) ?? record;
+      const saved = { ...latest, applied: [...new Set(fields)], appliedRecipe: state.recipe,
+        appliedProfileId: profileId, appliedProfile: profileSnapshot };
+      if (!await store.saveShot(saved)) throw new Error('The workflow was applied, but its shot record could not be saved.');
       state.records = await store.readRecent();
-    } else if (state.starter) {
-      const saved = await store.saveBeanDialIn(state.starter.beanId, workflowToRecipe(updated));
-      if (!saved) throw new Error('The starting point reached the machine but could not be saved for this bean.');
+    }
+    const beanId = bean?.beanId ?? starter?.beanId ??
+      state.beans?.find(candidate => candidate.name === bean?.name && candidate.roaster === bean?.roaster)?.id;
+    if (beanId && !await store.saveBeanDialIn(beanId, { recipe: state.recipe, profileId, profile: profileSnapshot })) {
+      throw new Error('The workflow was applied, but its dial-in could not be saved for this bean.');
     }
 
     // Applying is the end of this screen's job — the change is on the machine
@@ -1476,6 +1448,7 @@ async function applyAdviceResult(source: Advice, record: ShotRecord | null): Pro
     dismissAdvice();
   } catch (cause) {
     state.error = (cause as Error).message;
+    state.shotActionError = state.error;
   } finally {
     state.busy = false;
     render();
@@ -1620,13 +1593,17 @@ async function useBean(id: string): Promise<void> {
       const profiles = state.profiles ?? await gateway.readProfiles();
       state.profiles = profiles;
       const title = savedRecipe.profileTitle.trim().toLocaleLowerCase();
-      const match = profiles.find((entry) => (entry.profile.title ?? '').trim().toLocaleLowerCase() === title);
+      const profileId = preset ? preset.profileId : saved?.appliedProfileId;
+      const match = profileId
+        ? profiles.find(entry => entry.id === profileId)
+        : profiles.find(entry => entry.profile.title?.trim().toLocaleLowerCase() === title);
       if (match) {
-        const withProfile: WorkflowWire = { ...state.workflow, profile: match.profile };
+        const profile = (preset ? preset.profile : saved?.appliedProfile) ?? match.profile;
+        const withProfile: WorkflowWire = { ...state.workflow, profile };
         const tempPatch = savedRecipe.temperatureC === null
           ? {}
           : diffToWorkflowPatch(diffRecipe(workflowToRecipe(withProfile), { temperatureC: savedRecipe.temperatureC }), withProfile);
-        savedProfile = tempPatch.profile ?? match.profile;
+        savedProfile = tempPatch.profile ?? profile;
       }
     } catch {
       // Coffee selection still works when the profile library is unavailable;
@@ -1695,7 +1672,7 @@ async function requestStarterAdvice(): Promise<void> {
     const parsed = parseAdvice(reply, {});
     if (!parsed.ok) throw new Error(parsed.error);
     state.advice = parsed.advice;
-    state.adviceBase = { recipe: state.recipe, starting: true };
+    state.adviceBase = { recipe: state.recipe, starter: { beanId, bean: beanContext }, starting: true };
     state.appliedNote = null;
     state.lastAdvice = null;
     state.starter = { beanId, bean: beanContext };
@@ -2472,7 +2449,7 @@ root.addEventListener('click', (event) => {
     const record = state.records.find((candidate) => candidate.advice?.full);
     if (record?.advice?.full) {
       state.advice = record.advice.full;
-      state.adviceBase = { recipe: record.recipe, starting: false };
+      state.adviceBase = { recipe: record.recipe, record, starting: false };
       state.tab = 'brew';
       render();
       return;
@@ -2502,9 +2479,9 @@ root.addEventListener('click', (event) => {
 
   if (action === 'apply' && state.workflow) {
     const source = state.advice;
-    // Sample advice is illustrative only. It must never write to the machine.
-    if (!source || (!state.pending && !state.starter)) return;
-    void applyAdviceResult(source, state.pending?.record ?? null);
+    const base = state.adviceBase;
+    if (!source || (!base?.record && !base?.starter)) return;
+    void applyAdviceResult(source, base);
     return;
   }
 
