@@ -683,28 +683,34 @@ namespace eval ::crema::advisor {
 	# load it into the advice array, then run the same appliers as the live
 	# screen (grind number, dose/yield/temp -> profile + DE1, profile create/switch).
 	proc apply_stored_advice {adv} {
-		variable advice
 		ingest_advice $adv
-		# PROFILE FIRST - it loads the profile's own yield/temp, so it must run
-		# before the recipe or it clobbers the AI's target_yield/temperature.
-		set made_profile 0
+		apply_advice
+	}
+
+	# Both Apply buttons must save the profile and the bean with the same dial.
+	proc apply_advice {} {
+		variable advice
+		::crema::pages::crema_beans::ensure_lib
+		set gt $advice(grind_target)
+		if {$gt ne "" && (![string is double -strict $gt] || !($gt > 0 && $gt <= 100))} {
+			error "Invalid recommended grind '$gt'"
+		}
+
 		if {$advice(created_profile) ne ""} {
 			apply_created_profile
-			set made_profile 1
-		} elseif {$advice(profile_action) eq "switch" && $advice(profile_switch_to) ni {"" null}} {
+		} elseif {$advice(profile_action) eq "create"} {
+			error "The recommendation is missing its profile steps"
+		} elseif {$advice(profile_action) eq "switch"} {
 			apply_profile_switch
 		}
-		if {$advice(grind_target) ne "" && $advice(grind_target) != $::settings(grinder_setting)} {
-			apply_grind
+		if {$gt ne ""} {
+			set ::settings(grinder_setting) $gt
+			set ::crema_settings(last_grind) $gt
 		}
 		apply_recipe
-		# Give this bean its OWN named AI profile. created_profile already saved
-		# under this name; for switch/keep we snapshot the now-loaded profile +
-		# recipe so Apply ALWAYS yields "AI · <bean>" instead of leaving a shared
-		# profile like "Best overall pressure profile" active.
-		# Always, even after a created profile: apply_recipe ran after it was
-		# saved, so this is what puts the AI's yield/temp/dose into the file.
 		save_bean_profile
+		persist_bean_dialin
+		::crema::save_settings
 	}
 
 	# After an app restart the advisor memory is empty but the last shot's
@@ -781,64 +787,43 @@ namespace eval ::crema::advisor {
 	proc persist_bean_dialin {} {
 		set bn [current_bean]
 		if {$bn eq ""} { return }
-		catch {
-			set beans [ifexists ::crema_settings(beans) {}]
-			set idx -1; set i 0
-			foreach b $beans {
-				set nm ""; catch { set nm [string trim [dict get $b name]] }
-				if {$nm eq $bn} { set idx $i; break }
-				incr i
-			}
-			if {$idx < 0} { return }
-			set b [lindex $beans $idx]
-			# NEVER record ANOTHER bean's "AI ." profile as this bean's own - that
-			# made a fresh bean wear the previous bean's profile permanently
-			set pf [ifexists ::settings(profile_title) ""]
-			if {[string match "AI *" $pf] && ![string match "*$bn*" $pf]} { set pf "" }
-			dict set b dialin_profile $pf
-			dict set b dialin_grind   [ifexists ::settings(grinder_setting) ""]
-			dict set b dialin_dose    [ifexists ::settings(grinder_dose_weight) ""]
-			dict set b dialin_yield   [ifexists ::settings(final_desired_shot_weight) ""]
-			set ::crema_settings(beans) [lreplace $beans $idx $idx $b]
-			::crema::save_settings
-		}
+		set idx $::crema_settings(bean_sel)
+		set b [lindex $::crema_settings(beans) $idx]
+		if {[string trim [dict get $b name]] ne $bn} { return }
+		set pf [ifexists ::settings(profile_title) ""]
+		if {[string match "AI *" $pf] && $pf ne [ai_profile_title]} { set pf "" }
+		dict set b dialin_saved_at [clock seconds]
+		dict set b dialin_profile $pf
+		dict set b grind $::settings(grinder_setting)
+		dict set b dialin_grind $::settings(grinder_setting)
+		dict set b dialin_dose [ifexists ::settings(grinder_dose_weight) ""]
+		dict set b dialin_yield [ifexists ::settings(final_desired_shot_weight) ""]
+		lset ::crema_settings(beans) $idx $b
 	}
 
-	# restore a bean's saved starter dial-in from its library record - used only
-	# when the bean has no shots to restore from
+	# Restore the selected bean's last applied recipe.
 	proc restore_bean_snapshot {bean do_grind} {
-		set got_profile 0
-		foreach b [ifexists ::crema_settings(beans) {}] {
-			set nm ""; catch { set nm [string trim [dict get $b name]] }
-			if {$nm ne $bean} { continue }
-			catch {
-				if {[dict exists $b dialin_profile]} {
-					set pt [dict get $b dialin_profile]
-					# only this bean's OWN profile (its name) or a neutral one - never
-					# another bean's "AI ." profile that may have leaked into the record
-					set is_other_ai [expr {[string match "AI *" $pt] && ![string match "*$bean*" $pt]}]
-					if {$pt ne "" && $pt ne "Saved" && !$is_other_ai} {
-						if {$pt ne [ifexists ::settings(profile_title) ""]} {
-							set fn [resolve_profile_file $pt]
-							if {$fn ne ""} { select_profile $fn }
-						}
-						set got_profile 1
-					}
-				}
-			}
-			if {$do_grind} {
-				catch { if {[dict exists $b dialin_grind]} { set g [dict get $b dialin_grind]
-					if {[string is double -strict $g] && $g > 0} { set ::settings(grinder_setting) $g; set ::crema_settings(last_grind) $g } } }
-			}
-			catch { if {[dict exists $b dialin_yield]} { set y [dict get $b dialin_yield]
-				if {[string is double -strict $y] && $y > 0} { set ::settings(final_desired_shot_weight) $y; set ::settings(final_desired_shot_weight_advanced) $y } } }
-			catch { if {[dict exists $b dialin_dose]} { set d [dict get $b dialin_dose]
-				if {[string is double -strict $d] && $d > 0} { set ::settings(grinder_dose_weight) $d } } }
-			catch { ::save_settings }
-			catch { send_de1_settings_soon }
-			break
+		set b [lindex $::crema_settings(beans) $::crema_settings(bean_sel)]
+		if {[string trim [dict get $b name]] ne $bean} { return 0 }
+		set pt [::crema::pages::crema_beans::ifdict $b dialin_profile ""]
+		if {$pt eq "" || $pt eq "Saved" || ([string match "AI *" $pt] && $pt ne [ai_profile_title])} {
+			return 0
 		}
-		return $got_profile
+		if {$pt ne [ifexists ::settings(profile_title) ""]} {
+			set fn [resolve_profile_file $pt]
+			if {$fn eq "" || [select_profile $fn] eq "-1"} { return 0 }
+		}
+		if {$do_grind} {
+			catch { if {[dict exists $b dialin_grind]} { set g [dict get $b dialin_grind]
+				if {[string is double -strict $g] && $g > 0} { set ::settings(grinder_setting) $g; set ::crema_settings(last_grind) $g } } }
+		}
+		catch { if {[dict exists $b dialin_yield]} { set y [dict get $b dialin_yield]
+			if {[string is double -strict $y] && $y > 0} { set ::settings(final_desired_shot_weight) $y; set ::settings(final_desired_shot_weight_advanced) $y } } }
+		catch { if {[dict exists $b dialin_dose]} { set d [dict get $b dialin_dose]
+			if {[string is double -strict $d] && $d > 0} { set ::settings(grinder_dose_weight) $d } } }
+		catch { ::save_settings }
+		catch { send_de1_settings_soon }
+		return 1
 	}
 
 	# Self-heal: if the current bean is wearing ANOTHER bean's "AI ." profile (a
@@ -849,7 +834,7 @@ namespace eval ::crema::advisor {
 		set bn [current_bean]
 		if {$bn eq ""} { return }
 		set cur [ifexists ::settings(profile_title) ""]
-		if {[string match "AI *" $cur] && ![string match "*$bn*" $cur]} {
+		if {[string match "AI *" $cur] && $cur ne [ai_profile_title]} {
 			restore_bean_dialin $bn
 		}
 	}
@@ -863,7 +848,18 @@ namespace eval ::crema::advisor {
 		if {$bean eq ""} { hydrate_local; return }
 		set recent {}
 		catch { set recent [::crema::store::recent 1 $bean] }
+		# A recipe applied after the most recent shot is the next shot's recipe.
+		# Older library entries have no timestamp and still use shot history.
+		set applied 0
 		if {[llength $recent]} {
+			catch {
+				set b [lindex $::crema_settings(beans) $::crema_settings(bean_sel)]
+				if {[dict exists $b dialin_saved_at] && [dict get $b dialin_saved_at] >= [dict get [lindex $recent 0] id]} {
+					set applied [restore_bean_snapshot $bean $do_grind]
+				}
+			}
+		}
+		if {!$applied && [llength $recent]} {
 			set rec [lindex $recent 0]
 			# Load the profile FIRST - select_profile pulls in the profile's own
 			# yield/temperature, so it must run BEFORE we restore this bean's
@@ -898,7 +894,7 @@ namespace eval ::crema::advisor {
 			catch { ::save_settings }
 			catch { ::crema::save_settings }
 			catch { send_de1_settings_soon }
-		} else {
+		} elseif {!$applied} {
 			# no shots - restore this bean's saved STARTER dial-in if it has one, so
 			# a starting point survives bean switches. If it has no profile of its
 			# own, reset to a neutral default so it never wears the PREVIOUS bean's.
@@ -962,30 +958,6 @@ namespace eval ::crema::advisor {
 		catch { ::crema::pages::crema_home::refresh_ai_note }
 	}
 
-	proc apply_grind {} {
-		variable advice
-		if {$advice(grind_target) eq ""} { return }
-		# Apply the AI's grind target AS-IS. (An earlier version clamped it to
-		# ::crema_settings(grinder_range), but that range is user-configured and
-		# often wrong - e.g. it said 0.4-1.0 while the user actually grinds at
-		# 0.1-0.2 - so the clamp forced the AI's fine 0.15 up to 0.4. The AI is
-		# already told the range in the prompt; don't second-guess its number.)
-		set gt $advice(grind_target)
-		# sanity only: reject a truly nonsensical value (non-numeric / <=0 / absurd)
-		if {![string is double -strict $gt] || $gt <= 0 || $gt > 100} {
-			msg -ERROR "crema: apply_grind ignoring nonsensical target '$gt'"
-			return
-		}
-		set ::settings(grinder_setting) $gt
-		# remember it in Crema's durable store too, so the next feedback page opens
-		# on the applied grind instead of a reverted ::settings value
-		set ::crema_settings(last_grind) $gt
-		catch { ::save_settings }
-		catch { ::crema::save_settings }
-		msg -INFO "crema: grinder setting updated to $gt"
-	}
-
-	# dose / yield / temperature in one tap
 	# ---- undo -------------------------------------------------------------
 	# Apply is otherwise a one-way door: it can move the grind, the dose, the
 	# yield, every step's temperature AND the selected profile in one press, and
@@ -1070,6 +1042,8 @@ namespace eval ::crema::advisor {
 		set snap $undo_snapshot
 		set undo_snapshot ""
 		set ok [restore_state $snap]
+		persist_bean_dialin
+		::crema::save_settings
 		msg -INFO "crema: undo [expr {$ok ? {restored} : {found nothing to restore}}]"
 		return $ok
 	}
@@ -1086,8 +1060,6 @@ namespace eval ::crema::advisor {
 		if {$advice(temp_c) ne ""} {
 			apply_temp_target $advice(temp_c)
 		}
-		catch { ::save_settings }
-		catch { send_de1_settings_soon }
 		msg -INFO "crema: recipe applied dose=$advice(dose_g) yield=$advice(yield_g) temp=$advice(temp_c)"
 	}
 
@@ -1175,6 +1147,8 @@ namespace eval ::crema::advisor {
 		set ::settings(profile_title) $title
 		set ::settings(profile_to_save) $title
 		set ::settings(profile) $title
+		set ::settings(profile_grinder_setting) $::settings(grinder_setting)
+		set ::settings(profile_grinder_dose_weight) $::settings(grinder_dose_weight)
 		save_profile 0
 		set ::settings(profile_title) $title
 		catch { ::save_settings }
@@ -1187,75 +1161,89 @@ namespace eval ::crema::advisor {
 		variable advice
 		set cp $advice(created_profile)
 		if {$cp eq ""} { return }
-		if {[catch {
-			set steps {}
-			foreach s [dict get $cp steps] {
-				set step [dict create \
-					name [dict get $s name] \
-					temperature [dict get $s temperature] \
-					seconds [dict get $s seconds] \
-					transition [expr {[dict exists $s transition] ? [dict get $s transition] : "fast"}] \
-					sensor coffee \
-					pressure 0 flow 0 volume 100 \
-					exit_if 0 exit_flow_under 0 exit_flow_over 6 \
-					exit_pressure_under 0 exit_pressure_over 11]
-				if {[dict get $s pump] eq "flow"} {
-					dict set step pump flow
-					dict set step flow [dict get $s flow]
-				} else {
-					dict set step pump pressure
-					dict set step pressure [dict get $s pressure]
-				}
-				foreach k {exit_type exit_pressure_over exit_pressure_under exit_flow_over exit_flow_under} {
-					if {[dict exists $s $k] && [dict get $s $k] ni {null ""}} {
-						dict set step $k [dict get $s $k]
-						dict set step exit_if 1
+		set steps {}
+		foreach s [dict get $cp steps] {
+			set step [dict create \
+				name [dict get $s name] \
+				temperature [dict get $s temperature] \
+				seconds [dict get $s seconds] \
+				transition [expr {[dict exists $s transition] ? [dict get $s transition] : "fast"}] \
+				sensor coffee \
+				pressure 0 flow 0 volume 100 \
+				exit_if 0 exit_flow_under 0 exit_flow_over 6 \
+				exit_pressure_under 0 exit_pressure_over 11]
+			if {[dict get $s pump] eq "flow"} {
+				dict set step pump flow
+				dict set step flow [dict get $s flow]
+			} else {
+				dict set step pump pressure
+				dict set step pressure [dict get $s pressure]
+			}
+			# A flow step can carry a pressure ceiling in its DE1 extension frame.
+			# The inactive pressure setpoint on older advice has no defined meaning.
+			if {[dict exists $s pressure_limit_bar]} {
+				set limit [dict get $s pressure_limit_bar]
+				if {$limit ni {"" null}} {
+					if {![string is double -strict $limit] || !($limit >= 0 && $limit <= 10)} {
+						error "Invalid pressure limit for step '[dict get $s name]'"
+					}
+					if {$limit > 0} {
+						if {[dict get $step pump] ne "flow"} {
+							error "Pressure limit requires a flow step: '[dict get $s name]'"
+						}
+						dict set step max_flow_or_pressure $limit
+						dict set step max_flow_or_pressure_range [ifexists ::settings(maximum_pressure_range_advanced) 0.6]
 					}
 				}
-				lappend steps $step
 			}
-			if {![llength $steps]} { error "no steps" }
-
-			set title [ai_profile_title]
-			set claude_title ""
-			catch { set claude_title [dict get $cp title] }
-			set ::settings(advanced_shot) $steps
-			set ::settings(settings_profile_type) settings_2c
-			set ::settings(profile_title) $title
-			set ::settings(profile_to_save) $title
-			set ::settings(profile) $title
-			catch {
-				set notes [dict get $cp notes]
-				if {$claude_title ne ""} { set notes "$claude_title — $notes" }
-				set ::settings(profile_notes) $notes
+			# Providers can supply zeroes for unused thresholds on timed steps.
+			set type ""
+			if {[dict exists $s exit_type]} {
+				set type [string tolower [string trim [dict get $s exit_type]]]
 			}
-			catch {
-				set tw [dict get $cp target_weight_g]
-				if {[string is double -strict $tw]} {
-					set ::settings(final_desired_shot_weight) $tw
-					set ::settings(final_desired_shot_weight_advanced) $tw
+			if {$type ni {"" null none}} {
+				if {$type ni {pressure_over pressure_under flow_over flow_under}
+					|| ![dict exists $s exit_$type] || ![string is double -strict [dict get $s exit_$type]]} {
+					error "Invalid exit condition for step '[dict get $s name]'"
 				}
+				dict set step exit_type $type
+				dict set step exit_$type [dict get $s exit_$type]
+				dict set step exit_if 1
 			}
-			catch { set ::settings(espresso_temperature) [dict get [lindex $steps 0] temperature] }
-			save_ai_profile $title
-			msg -INFO "crema: created + activated profile '$title' ([llength $steps] steps)"
-		} err]} {
-			msg -ERROR "crema: apply_created_profile failed: $err"
+			lappend steps $step
 		}
+		if {![llength $steps]} { error "no steps" }
+
+		set title [ai_profile_title]
+		set claude_title ""
+		catch { set claude_title [dict get $cp title] }
+		set ::settings(advanced_shot) $steps
+		set ::settings(settings_profile_type) settings_2c
+		set ::settings(profile_title) $title
+		set ::settings(profile_to_save) $title
+		set ::settings(profile) $title
+		catch {
+			set notes [dict get $cp notes]
+			if {$claude_title ne ""} { set notes "$claude_title — $notes" }
+			set ::settings(profile_notes) $notes
+		}
+		catch {
+			set tw [dict get $cp target_weight_g]
+			if {[string is double -strict $tw]} {
+				set ::settings(final_desired_shot_weight) $tw
+				set ::settings(final_desired_shot_weight_advanced) $tw
+			}
+		}
+		catch { set ::settings(espresso_temperature) [dict get [lindex $steps 0] temperature] }
 	}
 
 	proc apply_profile_switch {} {
 		variable advice
-		if {![info exists advice(profile_switch_to)] || $advice(profile_switch_to) in {"" null}} { return }
 		set title [string trim $advice(profile_switch_to)]
+		if {$title in {"" null}} { error "The recommendation is missing a profile name" }
 		set fn [resolve_profile_file $title]
-		if {$fn eq ""} {
-			msg -ERROR "crema: profile '$title' not found - not switching"
-			return
-		}
-		if {[catch { select_profile $fn } err]} {
-			msg -ERROR "crema: profile switch to '$title' ($fn) failed: $err"
-			return
+		if {$fn eq "" || [select_profile $fn] eq "-1"} {
+			error "Profile '$title' could not be loaded"
 		}
 		msg -INFO "crema: switched profile to '$title' (file '$fn')"
 	}
@@ -1263,23 +1251,16 @@ namespace eval ::crema::advisor {
 	# Snapshot the currently-loaded profile (its curve + the recipe just applied)
 	# under a bean-specific AI name and activate it, so applying advice ALWAYS
 	# leaves this bean with its own profile in the list (e.g. "AI · abel salinas")
-	# instead of borrowing a shared one. Mirrors apply_created_profile's save tail.
+	# instead of borrowing a shared one.
 	# Called after apply_recipe so the AI's yield/temp are baked into the saved file.
 	proc save_bean_profile {} {
-		if {[catch {
-			set ai_title [ai_profile_title]
-			set src [string trim [ifexists ::settings(profile_title) ""]]
-			# note where it came from, but don't stack "Based on AI · ..." chains
-			catch {
-				if {$src ne "" && $src ne $ai_title && ![string match "AI *" $src]} {
-					set ::settings(profile_notes) "Based on $src"
-				}
-			}
-			save_ai_profile $ai_title
-			msg -INFO "crema: saved bean profile '$ai_title' (from '$src')"
-		} err]} {
-			msg -ERROR "crema: save_bean_profile failed: $err"
+		set ai_title [ai_profile_title]
+		set src [string trim [ifexists ::settings(profile_title) ""]]
+		if {$src ne "" && $src ne $ai_title && ![string match "AI *" $src]} {
+			set ::settings(profile_notes) "Based on $src"
 		}
+		save_ai_profile $ai_title
+		msg -INFO "crema: saved bean profile '$ai_title' (from '$src')"
 	}
 
 	# Resolve an AI-supplied profile TITLE to an actual profile file basename

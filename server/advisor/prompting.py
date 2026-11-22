@@ -25,6 +25,7 @@ ADVICE_SCHEMA = """{
         {"name": "<step name>", "temperature": <float C>, "seconds": <float max duration>,
          "pump": "pressure" | "flow", "pressure": <float bar, when pump=pressure>,
          "flow": <float mL/s, when pump=flow>, "transition": "fast" | "smooth",
+         "pressure_limit_bar": <number above 0 and at most 10 for a flow step with a pressure ceiling, otherwise null. Encode every recommended ceiling here>,
          "exit_type": "pressure_over" | "pressure_under" | "flow_over" | "flow_under" | null,
          "exit_pressure_over": <float>, "exit_pressure_under": <float>,
          "exit_flow_over": <float>, "exit_flow_under": <float>},

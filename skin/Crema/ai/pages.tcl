@@ -3,6 +3,22 @@
 
 namespace eval ::crema::pages {}
 
+# de1app force-loads the advanced editor's selection even on the Profiles
+# tab. After switching to a shorter or classic profile the widget can still
+# select an old row. Core already handles an empty selection.
+proc ::crema::pages::check_step_selection {cmd op} {
+	if {![info exists ::advanced_shot_steps_widget] || ![winfo exists $::advanced_shot_steps_widget]} { return }
+	set widget $::advanced_shot_steps_widget
+	set row [$widget curselection]
+	if {$row ne "" && ![dict exists [lindex $::settings(advanced_shot) $row] name]} {
+		$widget selection clear 0 end
+		set ::current_step_number 0
+	}
+}
+if {[llength [info commands ::load_advanced_profile_step]]} {
+	trace add execution ::load_advanced_profile_step enter ::crema::pages::check_step_selection
+}
+
 # Shared bottom tab bar (design: persistent nav on every screen).
 # active: which tab gets the accent + underline. prenav: script run before
 # navigating away (e.g. beans saves its fields).
@@ -613,37 +629,16 @@ namespace eval ::crema::pages::crema_advice {
 		# grinder_setting) so the status line is right
 		set target [set ${a}(grind_target)]
 		set grind_changes [expr {$target ne "" && $target != $::settings(grinder_setting)}]
-		# PROFILE FIRST: select_profile / a created profile loads the profile's OWN
-		# yield + temperature (+ dose), so it MUST run before apply_grind/apply_recipe
-		# or it clobbers the AI's target_yield / temperature / dose (the exact bug
-		# where Apply switched the profile but left yield/temp on the profile default).
-		set made_profile 0
-		if {[set ${a}(created_profile)] ne ""} {
-			::crema::advisor::apply_created_profile
-			set made_profile 1
-		} elseif {[set ${a}(profile_action)] eq "switch"} {
-			::crema::advisor::apply_profile_switch
-		}
-		# now force the AI's grind + recipe on top so they win over the profile
-		if {$target ne ""} {
-			::crema::advisor::apply_grind
-		}
-		::crema::advisor::apply_recipe
-		# Give this bean its OWN named AI profile so Apply always leaves
-		# "AI · <bean>" active (not a shared profile like "Best overall pressure
-		# profile"). created_profile already saved under this name; for switch/keep
-		# snapshot the now-loaded profile + recipe here, after apply_recipe.
-		# Always, even after a created profile: apply_recipe ran after that save,
-		# so this snapshot is what puts the AI's yield/temp/dose into the file.
-		catch { ::crema::advisor::save_bean_profile }
 		set page [namespace tail [namespace current]]
+		if {[catch { ::crema::advisor::apply_advice } err]} {
+			msg -ERROR "crema: Apply failed: $err"
+			dui item config $page adv_status -text "Couldn't apply: $err"
+			return
+		}
 		variable primary_mode
 		set primary_mode "done"
 		setlabel $page adv_apply_all "Applied"
 		catch { setvis $page adv_undo 1 }
-		# snapshot the applied dial-in onto this bean so a starting point (which has
-		# no shot to restore from) survives switching beans and coming back
-		catch { ::crema::advisor::persist_bean_dialin }
 		if {$grind_changes} {
 			catch { dui item config $page adv_status \
 				-text "Applied - now dial the grinder to $target" }
@@ -807,7 +802,7 @@ namespace eval ::crema::pages::crema_beans {
 		# doesn't wipe the profile/dose/yield a starting point set for this bean
 		catch {
 			set old [lindex $::crema_settings(beans) $i]
-			foreach k {dialin_profile dialin_grind dialin_dose dialin_yield} {
+			foreach k {dialin_profile dialin_grind dialin_dose dialin_yield dialin_saved_at} {
 				if {[dict exists $old $k]} { dict set b $k [dict get $old $k] }
 			}
 		}

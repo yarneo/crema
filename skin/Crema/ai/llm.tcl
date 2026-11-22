@@ -513,7 +513,7 @@ proc ::crema::llm::advice_schema {} {
   "profile": {
     "action": "keep" | "switch" | "create",
     "switch_to": <existing profile title or null>,
-    "created_profile": <null, or {"title","notes","target_weight_g","steps":[{"name","temperature","seconds","pump":"pressure"|"flow","pressure","flow","transition":"fast"|"smooth","exit_type","exit_pressure_over","exit_pressure_under","exit_flow_over","exit_flow_under"}]}>,
+    "created_profile": <null, or {"title","notes","target_weight_g","steps":[{"name","temperature","seconds","pump":"pressure"|"flow","pressure","flow","pressure_limit_bar":<number above 0 and at most 10 for a flow step with a pressure ceiling, otherwise null. Encode every recommended ceiling here>,"transition":"fast"|"smooth","exit_type":null|"pressure_over"|"pressure_under"|"flow_over"|"flow_under","exit_pressure_over","exit_pressure_under","exit_flow_over","exit_flow_under"}]}>,
     "reason": "<1 sentence or empty>"
   },
   "screen_summary": "<max 160 chars, imperative, what to do>"

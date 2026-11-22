@@ -46,8 +46,8 @@ namespace eval ::crema::devshot {
 				[dict create name Fill temperature 92 seconds 25 pump flow flow 8 \
 					transition fast exit_type pressure_over exit_pressure_over 3] \
 				[dict create name Infuse temperature 92 seconds 20 pump pressure pressure 3 \
-					transition fast] \
-				[dict create name Decline temperature 91 seconds 40 pump flow flow 2.0 \
+					transition fast exit_type none exit_pressure_over 0] \
+				[dict create name Decline temperature 91 seconds 40 pump flow flow 2.0 pressure_limit_bar 9 \
 					transition smooth]]]
 	}
 
@@ -59,6 +59,10 @@ namespace eval ::crema::devshot {
 			temp  {$::settings(espresso_temperature) == 92}
 			title {$::settings(profile_title) eq "AI · Sim Guji"}
 			steps {[llength $::settings(advanced_shot)] == 3}
+			timed_infuse {[dict get [lindex $::settings(advanced_shot) 1] exit_if] == 0}
+			fill_exit {[dict get [lindex $::settings(advanced_shot) 0] exit_pressure_over] == 3}
+			pour_limit {[dict get [lindex $::settings(advanced_shot) 2] max_flow_or_pressure] == 9}
+			fill_no_limit {![dict exists [lindex $::settings(advanced_shot) 0] max_flow_or_pressure]}
 			type  {$::settings(settings_profile_type) eq "settings_2c"}
 		} {
 			if {![expr $expr_]} { log "TOOLFAIL: $desc"; set ok 0 }
