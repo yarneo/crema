@@ -1,6 +1,6 @@
 {
   "name": "crema-skin",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "type": "module",
   "description": "Crema — an AI dial-in coach as a Decent.app skin",

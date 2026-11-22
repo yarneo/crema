@@ -109,6 +109,13 @@ provider (see [Choosing a provider](#choosing-a-provider)).
 4. **Run the setup wizard.** On first launch Crema asks for two things — your grinder
    and your AI provider + key. That's it. Pull a shot.
 
+## What's new in v1.1.3
+
+Both skins now save the AI profile and recommended grind together. A flow step with a recommended pressure ceiling saves that ceiling as a DE1 step limiter.
+
+- **Classic Tcl skin** — Apply works from the advice card and shot history. Returning to Brew or reselecting a bean restores the applied dial-in, including for long bean names. Timed bloom steps accept `none` as an exit setting. Opening Profiles after a step-count change clears stale editor selections.
+- **Decaid skin 0.2.2** — Apply works when advice is reopened from Brew or shot history. It preserves fine grind settings such as 0.12, saves the final profile to the library, and restores the saved revision when the bean is selected again.
+
 ## What's new in v1.1.2
 
 Two fixes to the classic tablet skin, both found on a real machine.
